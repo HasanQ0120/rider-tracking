@@ -2,7 +2,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0a192f;
 }
 
 @theme inline {
@@ -10,13 +10,18 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Brand palette -- fixed identity, not theme-switchable. */
+  --color-brand-navy: #0a192f;
+  --color-brand-gold: #ffd700;
+  --color-brand-white: #ffffff;
+
+  /* Status colors are intentionally NOT under `brand` and never restyled --
+     they're read instinctively, so overriding them with brand colors would
+     confuse the signal. */
+  --color-status-success: #16a34a;
+  --color-status-danger: #dc2626;
+  --color-status-warning: #f59e0b;
 }
 
 body {

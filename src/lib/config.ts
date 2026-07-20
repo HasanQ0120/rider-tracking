@@ -1,0 +1,11 @@
+export const MAX_ACCURACY_M = 75;
+export const LOCATION_MIN_INTERVAL_MS = 3000;
+export const IMPLAUSIBLE_SPEED_KMH = 150;
+export const PIN_MAX_ATTEMPTS = 5;
+export const PIN_LOCKOUT_MINUTES = 15;
+export const RESEND_RATE_LIMIT_MINUTES = 2;
+export const PROXIMITY_RADIUS_M = 60;
+export const PROXIMITY_SUSTAIN_SECONDS = 90;
+export const CONNECTION_LOST_TIMEOUT_S = 25;
+export const TOKEN_TIME_BUDGET_HOURS = 4;
+export const HISTORY_RETENTION_DAYS = 3;
