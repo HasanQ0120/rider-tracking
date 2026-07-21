@@ -64,7 +64,11 @@ export function OrderDetail({
     }
     setNeedsConfirm(false);
     if (data.status === "ok") {
-      setMessage("Rider assigned. Links sent.");
+      setMessage(
+        data.pin
+          ? `Rider assigned. Test-mode PIN (no real SMS provider connected yet): ${data.pin}`
+          : "Rider assigned. Links sent."
+      );
       router.refresh();
     } else {
       setMessage(`Failed: ${data.status}`);

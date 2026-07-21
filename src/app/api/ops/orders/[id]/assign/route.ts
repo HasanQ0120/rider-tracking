@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
 import { generateTrackingToken, generatePin, hashPin } from "@/lib/tokens";
-import { sendRiderLink, sendRiderPin, sendCustomerLink } from "@/lib/notify";
+import { sendRiderLink, sendRiderPin, sendCustomerLink, isTestNotificationProvider } from "@/lib/notify";
 import { TOKEN_TIME_BUDGET_HOURS } from "@/lib/config";
 
 export async function POST(
@@ -105,5 +105,11 @@ export async function POST(
     }
   }
 
-  return NextResponse.json({ status: "ok" });
+  // Only while no real SMS provider is connected -- once isTestNotificationProvider
+  // flips to false (a real provider swapped in), this stops being included
+  // and the PIN only ever reaches the rider via the actual SMS.
+  return NextResponse.json({
+    status: "ok",
+    pin: isTestNotificationProvider ? pin : undefined,
+  });
 }
