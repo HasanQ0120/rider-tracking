@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { CallButton } from "@/components/ui/CallButton";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { haversineMeters } from "@/lib/geo";
 import {
@@ -38,7 +39,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const poll = useCallback(async () => {
-    const res = await fetch(`/api/customer/${token}/poll`);
+    // no-store: the browser itself can also cache a repeated GET to the
+    // same URL, on top of the server-side caching fixed in the route.
+    const res = await fetch(`/api/customer/${token}/poll`, { cache: "no-store" });
     if (res.status !== 200) return;
     const data = await res.json();
     if (data.status !== "ok") return;
@@ -130,7 +133,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           Tracking link expired. We&apos;re re-establishing the connection with your rider — this
           page will resume automatically.
         </StatusBanner>
-        {rider && <CallButton phone={rider.phone} />}
+        {rider && <CallButton phone={rider.phone} label="Call Rider" />}
       </div>
     );
   }
@@ -177,7 +180,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
         />
       </div>
       <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4">
-        {rider && <CallButton phone={rider.phone} />}
+        {rider && <CallButton phone={rider.phone} label="Call Rider" />}
         {canComplete && (
           <Button onClick={tapComplete} disabled={completing} className="flex-1">
             Complete
@@ -185,14 +188,6 @@ export function CustomerTrackingClient({ token }: { token: string }) {
         )}
       </div>
     </div>
-  );
-}
-
-function CallButton({ phone }: { phone: string }) {
-  return (
-    <a href={`tel:${phone}`}>
-      <Button variant="accent">Call Rider</Button>
-    </a>
   );
 }
 

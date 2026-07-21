@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
+// Without this, Next.js can serve a cached response for this GET route
+// (its Full Route Cache applies to GET handlers by default) and/or
+// Vercel's edge network can cache it too -- either would mean the customer
+// keeps re-polling into a stale snapshot instead of the rider's actual
+// current position, however often the client asks. force-dynamic plus the
+// explicit no-store header below close both paths.
+export const dynamic = "force-dynamic";
+
 // Frequent, lightweight polling endpoint for the customer page -- replaces
 // an earlier direct-Supabase-Realtime subscription that depended on the
 // browser holding a custom-signed JWT. That JWT was signed with the legacy
@@ -46,5 +54,8 @@ export async function GET(
     .eq("order_id", tokenRow.order_id)
     .maybeSingle();
 
-  return NextResponse.json({ status: "ok", order, loc });
+  return NextResponse.json(
+    { status: "ok", order, loc },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  );
 }

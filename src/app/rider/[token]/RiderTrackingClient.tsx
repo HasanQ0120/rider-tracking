@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { CallButton } from "@/components/ui/CallButton";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { getOrCreateDeviceKey } from "@/lib/deviceKey";
+import { haversineMeters } from "@/lib/geo";
 import {
   LOCATION_MIN_INTERVAL_MS,
   MAX_ACCURACY_M,
   MARKER_COLOR_CUSTOMER,
   MARKER_COLOR_RIDER,
+  PROXIMITY_RADIUS_M,
 } from "@/lib/config";
 
 type Screen =
@@ -30,6 +33,7 @@ type OrderInfo = {
   delivery_lat: number | null;
   delivery_lng: number | null;
   delivery_address: string;
+  customer_phone: string;
 };
 
 async function postJson(url: string, body: unknown) {
@@ -325,6 +329,13 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }
 
   // screen === "tracking"
+  const withinDeliveryRadius = Boolean(
+    ownPosition &&
+      order?.delivery_lat != null &&
+      order?.delivery_lng != null &&
+      haversineMeters(order.delivery_lat, order.delivery_lng, ownPosition.lat, ownPosition.lng) <=
+        PROXIMITY_RADIUS_M
+  );
   const markers: MapMarker[] = [];
   if (order?.delivery_lat != null && order?.delivery_lng != null) {
     markers.push({
@@ -369,7 +380,10 @@ export function RiderTrackingClient({ token }: { token: string }) {
         />
       </div>
       <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4">
-        {!arrivedTapped && (
+        {order?.customer_phone && (
+          <CallButton phone={order.customer_phone} label="Call Customer" />
+        )}
+        {!arrivedTapped && withinDeliveryRadius && (
           <Button onClick={tapArrived} disabled={arrivedBusy}>
             I&apos;ve Arrived
           </Button>
