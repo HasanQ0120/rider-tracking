@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { getOrCreateDeviceKey } from "@/lib/deviceKey";
-import { LOCATION_MIN_INTERVAL_MS, MAX_ACCURACY_M } from "@/lib/config";
+import {
+  LOCATION_MIN_INTERVAL_MS,
+  MAX_ACCURACY_M,
+  MARKER_COLOR_CUSTOMER,
+  MARKER_COLOR_RIDER,
+} from "@/lib/config";
 
 type Screen =
   | "loading"
@@ -47,11 +52,28 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const [arrivedTapped, setArrivedTapped] = useState(false);
   const [ownPosition, setOwnPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [arrivedBusy, setArrivedBusy] = useState(false);
+  const [deliveredBusy, setDeliveredBusy] = useState(false);
 
   const deviceKeyRef = useRef<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Every one of init/verify-pin creates a fresh session that supersedes
+  // whatever was previously active for this rider token. If this effect
+  // (or a button handler below) ever fires twice in quick succession --
+  // React StrictMode's dev-mode double-invoke, a fast double-tap on a
+  // button with no in-flight guard, a bounced network request -- the
+  // second call silently invalidates the first call's session. Whichever
+  // response happens to update React state last then holds a session_id
+  // that's already been superseded, and the very next location send comes
+  // back "session_superseded" even though only one tab/device was ever
+  // really involved. This ref makes the mount-time init() call idempotent;
+  // pinSubmitting below does the same for the PIN-confirm button.
+  const initCalledRef = useRef(false);
 
   useEffect(() => {
+    if (initCalledRef.current) return;
+    initCalledRef.current = true;
     deviceKeyRef.current = getOrCreateDeviceKey(token);
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,28 +112,34 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }, [token]);
 
   const submitPin = useCallback(async () => {
+    if (pinSubmitting) return;
+    setPinSubmitting(true);
     setPinError(null);
-    const { res, data } = await postJson(`/api/rider/${token}/verify-pin`, {
-      pin,
-      device_key: deviceKeyRef.current,
-    });
-    if (data.status === "active") {
-      setSessionId(data.sessionId);
-      setScreen("ready");
-    } else if (data.status === "locked_out") {
-      setScreen("locked_out");
-    } else if (data.status === "blocked_device") {
-      setScreen("blocked_device");
-    } else if (res.status === 401) {
-      setPinError(
-        data.attemptsRemaining != null
-          ? `Incorrect PIN. ${data.attemptsRemaining} attempt(s) remaining.`
-          : "Incorrect PIN."
-      );
-    } else {
-      setPinError("Something went wrong. Please try again.");
+    try {
+      const { res, data } = await postJson(`/api/rider/${token}/verify-pin`, {
+        pin,
+        device_key: deviceKeyRef.current,
+      });
+      if (data.status === "active") {
+        setSessionId(data.sessionId);
+        setScreen("ready");
+      } else if (data.status === "locked_out") {
+        setScreen("locked_out");
+      } else if (data.status === "blocked_device") {
+        setScreen("blocked_device");
+      } else if (res.status === 401) {
+        setPinError(
+          data.attemptsRemaining != null
+            ? `Incorrect PIN. ${data.attemptsRemaining} attempt(s) remaining.`
+            : "Incorrect PIN."
+        );
+      } else {
+        setPinError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setPinSubmitting(false);
     }
-  }, [token, pin]);
+  }, [token, pin, pinSubmitting]);
 
   const sendLocation = useCallback(
     (lat: number, lng: number, accuracy: number) => {
@@ -182,15 +210,23 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }, []);
 
   const tapArrived = useCallback(async () => {
-    await postJson(`/api/rider/${token}/arrived`, { device_key: deviceKeyRef.current });
-    setArrivedTapped(true);
-  }, [token]);
+    if (arrivedBusy) return;
+    setArrivedBusy(true);
+    try {
+      await postJson(`/api/rider/${token}/arrived`, { device_key: deviceKeyRef.current });
+      setArrivedTapped(true);
+    } finally {
+      setArrivedBusy(false);
+    }
+  }, [token, arrivedBusy]);
 
   const tapDelivered = useCallback(async () => {
+    if (deliveredBusy) return;
+    setDeliveredBusy(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     await postJson(`/api/rider/${token}/complete`, { device_key: deviceKeyRef.current });
     setScreen("completed");
-  }, [token]);
+  }, [token, deliveredBusy]);
 
   const requestResend = useCallback(async () => {
     setResendState("sending");
@@ -263,10 +299,10 @@ export function RiderTrackingClient({ token }: { token: string }) {
         )}
         <Button
           className="mt-4 w-full"
-          disabled={pin.length !== 6}
+          disabled={pin.length !== 6 || pinSubmitting}
           onClick={submitPin}
         >
-          Confirm PIN
+          {pinSubmitting ? "Confirming…" : "Confirm PIN"}
         </Button>
       </div>
     );
@@ -290,12 +326,12 @@ export function RiderTrackingClient({ token }: { token: string }) {
       id: "delivery",
       lat: order.delivery_lat,
       lng: order.delivery_lng,
-      color: "#0A192F",
+      color: MARKER_COLOR_CUSTOMER,
       label: "Delivery address",
     });
   }
   if (ownPosition) {
-    markers.push({ id: "self", lat: ownPosition.lat, lng: ownPosition.lng, color: "#FFD700" });
+    markers.push({ id: "self", lat: ownPosition.lat, lng: ownPosition.lng, color: MARKER_COLOR_RIDER });
   }
   const defaultCenter: [number, number] = order?.delivery_lng
     ? [order.delivery_lat!, order.delivery_lng]
@@ -309,11 +345,26 @@ export function RiderTrackingClient({ token }: { token: string }) {
         )}
       </div>
       <div className="flex-1">
-        <TrackingMap markers={markers} defaultCenter={defaultCenter} />
+        <TrackingMap
+          markers={markers}
+          defaultCenter={defaultCenter}
+          routeFrom={ownPosition}
+          routeTo={
+            order?.delivery_lat != null && order?.delivery_lng != null
+              ? { lat: order.delivery_lat, lng: order.delivery_lng }
+              : null
+          }
+        />
       </div>
       <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4">
-        {!arrivedTapped && <Button onClick={tapArrived}>I&apos;ve Arrived</Button>}
-        <Button onClick={tapDelivered}>Mark as Delivered</Button>
+        {!arrivedTapped && (
+          <Button onClick={tapArrived} disabled={arrivedBusy}>
+            I&apos;ve Arrived
+          </Button>
+        )}
+        <Button onClick={tapDelivered} disabled={deliveredBusy}>
+          Mark as Delivered
+        </Button>
         <button
           onClick={requestResend}
           disabled={resendState === "sending" || resendState === "limited"}

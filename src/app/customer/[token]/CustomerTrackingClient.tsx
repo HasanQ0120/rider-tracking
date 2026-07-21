@@ -7,7 +7,12 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { haversineMeters } from "@/lib/geo";
-import { CONNECTION_LOST_TIMEOUT_S, PROXIMITY_RADIUS_M } from "@/lib/config";
+import {
+  CONNECTION_LOST_TIMEOUT_S,
+  PROXIMITY_RADIUS_M,
+  MARKER_COLOR_CUSTOMER,
+  MARKER_COLOR_RIDER,
+} from "@/lib/config";
 
 type OrderInfo = {
   id: string;
@@ -157,10 +162,10 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
   const markers: MapMarker[] = [];
   if (order.delivery_lat != null && order.delivery_lng != null) {
-    markers.push({ id: "delivery", lat: order.delivery_lat, lng: order.delivery_lng, color: "#0A192F" });
+    markers.push({ id: "delivery", lat: order.delivery_lat, lng: order.delivery_lng, color: MARKER_COLOR_CUSTOMER });
   }
   if (loc) {
-    markers.push({ id: "rider", lat: loc.lat, lng: loc.lng, color: "#FFD700" });
+    markers.push({ id: "rider", lat: loc.lat, lng: loc.lng, color: MARKER_COLOR_RIDER });
   }
   const defaultCenter: [number, number] = order.delivery_lng
     ? [order.delivery_lat!, order.delivery_lng]
@@ -178,7 +183,16 @@ export function CustomerTrackingClient({ token }: { token: string }) {
         )}
       </div>
       <div className="flex-1">
-        <TrackingMap markers={markers} defaultCenter={defaultCenter} />
+        <TrackingMap
+          markers={markers}
+          defaultCenter={defaultCenter}
+          routeFrom={loc}
+          routeTo={
+            order.delivery_lat != null && order.delivery_lng != null
+              ? { lat: order.delivery_lat, lng: order.delivery_lng }
+              : null
+          }
+        />
       </div>
       <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4">
         {rider && <CallButton phone={rider.phone} />}

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { haversineMeters } from "@/lib/geo";
+import { ROUTE_REFETCH_MIN_DISTANCE_M, ROUTE_REFETCH_MIN_INTERVAL_MS } from "@/lib/config";
 
 export type MapMarker = {
   id: string;
@@ -12,22 +14,32 @@ export type MapMarker = {
   label?: string;
 };
 
+type LatLng = { lat: number; lng: number };
+
 // Thin wrapper: the backend/Realtime pipeline only ever hands this
 // component {lat,lng} pairs. This is the only place that turns a
 // coordinate into something drawn on screen.
 export function TrackingMap({
   markers,
   defaultCenter,
+  routeFrom,
+  routeTo,
 }: {
   markers: MapMarker[];
   // Leaflet-native order: [lat, lng] (not Mapbox's [lng, lat]).
   defaultCenter: [number, number];
+  // Optional road-following route line (rider -> delivery address), drawn
+  // via OSRM. Omit or pass null on either end to hide the line.
+  routeFrom?: LatLng | null;
+  routeTo?: LatLng | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const hasFitRef = useRef(false);
+  const routeLineRef = useRef<Leaflet.Polyline | null>(null);
+  const lastRouteFetchRef = useRef<{ at: number; from: LatLng | null }>({ at: 0, from: null });
   // Forces the marker effect below to re-run once the async Leaflet import
   // + map creation finish -- without this, a caller whose `markers` prop
   // doesn't change again after mount (e.g. a one-shot address preview)
@@ -72,6 +84,7 @@ export function TrackingMap({
       mapRef.current = null;
       leafletRef.current = null;
       markerRefs.current = {};
+      routeLineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -107,6 +120,58 @@ export function TrackingMap({
       }
     }
   }, [markers, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+
+    if (!routeFrom || !routeTo) {
+      routeLineRef.current?.remove();
+      routeLineRef.current = null;
+      lastRouteFetchRef.current = { at: 0, from: null };
+      return;
+    }
+
+    const last = lastRouteFetchRef.current;
+    const now = Date.now();
+    const movedEnoughOrFirstFetch =
+      !last.from || haversineMeters(last.from.lat, last.from.lng, routeFrom.lat, routeFrom.lng) >= ROUTE_REFETCH_MIN_DISTANCE_M;
+    const longEnoughSinceLastFetch = now - last.at >= ROUTE_REFETCH_MIN_INTERVAL_MS;
+    // Existing line already drawn and nothing's moved enough to justify a
+    // refetch -- leave it as-is rather than hit OSRM again.
+    if (routeLineRef.current && !(movedEnoughOrFirstFetch && longEnoughSinceLastFetch)) {
+      return;
+    }
+
+    lastRouteFetchRef.current = { at: now, from: routeFrom };
+    const params = new URLSearchParams({
+      fromLat: String(routeFrom.lat),
+      fromLng: String(routeFrom.lng),
+      toLat: String(routeTo.lat),
+      toLng: String(routeTo.lng),
+    });
+    fetch(`/api/directions?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status !== "ok" || !mapRef.current) return;
+        const latLngs: [number, number][] = data.points.map((p: LatLng) => [p.lat, p.lng]);
+        if (routeLineRef.current) {
+          routeLineRef.current.setLatLngs(latLngs);
+        } else {
+          routeLineRef.current = L.polyline(latLngs, {
+            color: "#0A192F",
+            weight: 4,
+            opacity: 0.65,
+          }).addTo(map);
+        }
+      })
+      .catch(() => {
+        // Route line is a nice-to-have overlay -- a failed/rate-limited
+        // fetch just means no line this tick, never something to surface
+        // as an error to the rider/customer.
+      });
+  }, [routeFrom, routeTo]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
