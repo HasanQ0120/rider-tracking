@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { signCustomerJwt } from "@/lib/supabase/customerJwt";
 
 export async function POST(
   _req: Request,
@@ -46,11 +45,8 @@ export async function POST(
     rider = data ?? null;
   }
 
-  const jwtToken = signCustomerJwt(order.id);
-
   return NextResponse.json({
     status: "ok",
-    jwt: jwtToken,
     order,
     rider,
   });

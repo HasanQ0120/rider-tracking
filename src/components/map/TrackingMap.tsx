@@ -16,6 +16,37 @@ export type MapMarker = {
 
 type LatLng = { lat: number; lng: number };
 
+const MARKER_ANIMATION_MS = 800;
+
+// Ease-out: fast start, gentle settle -- reads as a glide rather than the
+// jarring snap of setting a new lat/lng instantly, and rather than a robotic
+// constant-speed slide.
+function easeOutQuad(t: number): number {
+  return t * (2 - t);
+}
+
+function animateMarkerTo(
+  marker: Leaflet.Marker,
+  to: LatLng,
+  durationMs: number,
+  onFrame: (frameId: number) => void
+) {
+  const from = marker.getLatLng();
+  const fromLat = from.lat;
+  const fromLng = from.lng;
+  const start = performance.now();
+
+  function step(now: number) {
+    const t = Math.min((now - start) / durationMs, 1);
+    const eased = easeOutQuad(t);
+    marker.setLatLng([fromLat + (to.lat - fromLat) * eased, fromLng + (to.lng - fromLng) * eased]);
+    if (t < 1) {
+      onFrame(requestAnimationFrame(step));
+    }
+  }
+  onFrame(requestAnimationFrame(step));
+}
+
 // Thin wrapper: the backend/Realtime pipeline only ever hands this
 // component {lat,lng} pairs. This is the only place that turns a
 // coordinate into something drawn on screen.
@@ -37,6 +68,7 @@ export function TrackingMap({
   const mapRef = useRef<Leaflet.Map | null>(null);
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
+  const markerAnimRefs = useRef<Record<string, number>>({});
   const hasFitRef = useRef(false);
   const routeLineRef = useRef<Leaflet.Polyline | null>(null);
   const lastRouteFetchRef = useRef<{ at: number; from: LatLng | null }>({ at: 0, from: null });
@@ -80,6 +112,8 @@ export function TrackingMap({
 
     return () => {
       cancelled = true;
+      Object.values(markerAnimRefs.current).forEach(cancelAnimationFrame);
+      markerAnimRefs.current = {};
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -97,7 +131,11 @@ export function TrackingMap({
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
-        existing.setLatLng([marker.lat, marker.lng]);
+        const prevFrame = markerAnimRefs.current[marker.id];
+        if (prevFrame) cancelAnimationFrame(prevFrame);
+        animateMarkerTo(existing, { lat: marker.lat, lng: marker.lng }, MARKER_ANIMATION_MS, (frameId) => {
+          markerAnimRefs.current[marker.id] = frameId;
+        });
       } else {
         const icon = L.divIcon({
           className: "",

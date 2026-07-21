@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { haversineMeters } from "@/lib/geo";
 import {
   CONNECTION_LOST_TIMEOUT_S,
   PROXIMITY_RADIUS_M,
+  CUSTOMER_POLL_INTERVAL_MS,
   MARKER_COLOR_CUSTOMER,
   MARKER_COLOR_RIDER,
 } from "@/lib/config";
@@ -22,11 +21,10 @@ type OrderInfo = {
   delivery_lng: number | null;
   rider_arrived_at: string | null;
   tracking_expired_unresolved: boolean;
+  delivery_confirmed_by?: string | null;
 };
 type Rider = { name: string; phone: string } | null;
 type Loc = { lat: number; lng: number; accuracy_m: number; recorded_at: string };
-
-const JWT_REFRESH_MS = 10 * 60 * 1000;
 
 export function CustomerTrackingClient({ token }: { token: string }) {
   const [screen, setScreen] = useState<"loading" | "invalid" | "live">("loading");
@@ -36,63 +34,40 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const [connectionLost, setConnectionLost] = useState(false);
   const [completing, setCompleting] = useState(false);
 
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const supabaseRef = useRef(createBrowserClient());
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const refreshAuth = useCallback(async () => {
-    const res = await fetch(`/api/customer/${token}/init`, { method: "POST" });
+  const poll = useCallback(async () => {
+    const res = await fetch(`/api/customer/${token}/poll`);
+    if (res.status !== 200) return;
     const data = await res.json();
-    if (data.status !== "ok") {
-      setScreen("invalid");
-      return null;
-    }
-    setOrder(data.order);
-    setRider(data.rider);
-    setScreen("live");
-    await supabaseRef.current.realtime.setAuth(data.jwt);
-    return data.order.id as string;
+    if (data.status !== "ok") return;
+    if (data.order) setOrder((prev) => (prev ? { ...prev, ...data.order } : prev));
+    if (data.loc) setLoc(data.loc);
   }, [token]);
 
   useEffect(() => {
-    let jwtTimer: ReturnType<typeof setInterval> | null = null;
-
     (async () => {
-      const orderId = await refreshAuth();
-      if (!orderId) return;
-
-      const supabase = supabaseRef.current;
-
-      const { data: initial } = await supabase
-        .from("current_locations")
-        .select("lat, lng, accuracy_m, recorded_at")
-        .eq("order_id", orderId)
-        .maybeSingle();
-      if (initial) setLoc(initial);
-
-      const channel = supabase
-        .channel(`order-${orderId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "current_locations", filter: `order_id=eq.${orderId}` },
-          (payload) => setLoc(payload.new as Loc)
-        )
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
-          (payload) => setOrder(payload.new as OrderInfo)
-        )
-        .subscribe();
-      channelRef.current = channel;
-
-      // Re-validates the customer token against the DB on every refresh --
-      // access is enforced per-connection, not just once at first load.
-      jwtTimer = setInterval(refreshAuth, JWT_REFRESH_MS);
+      const res = await fetch(`/api/customer/${token}/init`, { method: "POST" });
+      const data = await res.json();
+      if (data.status !== "ok") {
+        setScreen("invalid");
+        return;
+      }
+      setOrder(data.order);
+      setRider(data.rider);
+      setScreen("live");
+      await poll();
     })();
 
+    // Plain polling through our own service-role-backed API rather than a
+    // direct Supabase Realtime subscription -- see /api/customer/[token]/poll
+    // for why (a custom-signed JWT from the browser was silently rejected
+    // by Realtime, so the rider marker never appeared here even though the
+    // rider's own page worked fine).
+    pollTimerRef.current = setInterval(poll, CUSTOMER_POLL_INTERVAL_MS);
     return () => {
-      channelRef.current?.unsubscribe();
-      if (jwtTimer) clearInterval(jwtTimer);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

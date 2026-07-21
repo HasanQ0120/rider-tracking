@@ -22,3 +22,8 @@ export const MARKER_COLOR_RIDER = "#000000";
 // unnecessarily heavy for a line that barely changes tick-to-tick anyway.
 export const ROUTE_REFETCH_MIN_DISTANCE_M = 40;
 export const ROUTE_REFETCH_MIN_INTERVAL_MS = 15000;
+
+// How often the customer page polls for the rider's location + order status.
+// Plain polling through our own API, not a Supabase Realtime subscription --
+// see /api/customer/[token]/poll for why.
+export const CUSTOMER_POLL_INTERVAL_MS = 4000;
