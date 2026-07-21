@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
 
-export default function OpsLoginPage() {
+function OpsLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // requireOpsUser() redirects a logged-in-but-not-provisioned account
+    // back here with this param -- without reading it, that login looks
+    // like it silently did nothing, which is exactly what was reported.
+    if (searchParams.get("error") === "not_authorized") {
+      setError(
+        "Your account signed in successfully, but isn't provisioned for ops access yet. Ask an existing ops user to add you."
+      );
+    }
+  }, [searchParams]);
 
   async function submit() {
     setLoading(true);
@@ -65,5 +77,13 @@ export default function OpsLoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function OpsLoginPage() {
+  return (
+    <Suspense>
+      <OpsLoginForm />
+    </Suspense>
   );
 }
