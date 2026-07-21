@@ -38,3 +38,16 @@ export function computeSpeedKmh(
 export function isSpeedImplausible(speedKmh: number): boolean {
   return speedKmh > IMPLAUSIBLE_SPEED_KMH;
 }
+
+// Initial great-circle bearing from point 1 to point 2, in degrees,
+// 0 = north, clockwise (matches CSS rotate()'s clockwise-positive
+// convention directly, so this maps straight onto a rotated arrow icon).
+export function computeBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaLng = ((lng2 - lng1) * Math.PI) / 180;
+  const y = Math.sin(deltaLng) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLng);
+  const theta = Math.atan2(y, x);
+  return ((theta * 180) / Math.PI + 360) % 360;
+}

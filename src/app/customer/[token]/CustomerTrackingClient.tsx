@@ -24,7 +24,7 @@ type OrderInfo = {
   delivery_confirmed_by?: string | null;
 };
 type Rider = { name: string; phone: string } | null;
-type Loc = { lat: number; lng: number; accuracy_m: number; recorded_at: string };
+type Loc = { lat: number; lng: number; accuracy_m: number; heading: number | null; recorded_at: string };
 
 export function CustomerTrackingClient({ token }: { token: string }) {
   const [screen, setScreen] = useState<"loading" | "invalid" | "live">("loading");
@@ -140,7 +140,14 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     markers.push({ id: "delivery", lat: order.delivery_lat, lng: order.delivery_lng, color: MARKER_COLOR_CUSTOMER });
   }
   if (loc) {
-    markers.push({ id: "rider", lat: loc.lat, lng: loc.lng, color: MARKER_COLOR_RIDER });
+    markers.push({
+      id: "rider",
+      lat: loc.lat,
+      lng: loc.lng,
+      color: MARKER_COLOR_RIDER,
+      shape: "arrow",
+      heading: loc.heading,
+    });
   }
   const defaultCenter: [number, number] = order.delivery_lng
     ? [order.delivery_lat!, order.delivery_lng]

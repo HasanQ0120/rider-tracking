@@ -42,7 +42,7 @@ export async function GET(
 
   const { data: loc } = await supabase
     .from("current_locations")
-    .select("lat, lng, accuracy_m, recorded_at")
+    .select("lat, lng, accuracy_m, heading, recorded_at")
     .eq("order_id", tokenRow.order_id)
     .maybeSingle();
 

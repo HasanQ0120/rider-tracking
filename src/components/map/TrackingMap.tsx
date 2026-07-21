@@ -12,11 +12,17 @@ export type MapMarker = {
   lat: number;
   color: string;
   label?: string;
+  // "dot" (default) is a plain colored circle. "arrow" draws a directional
+  // navigation-style arrow rotated by `heading` degrees (0=north,
+  // clockwise) -- used for the rider's marker, never the delivery address.
+  shape?: "dot" | "arrow";
+  heading?: number | null;
 };
 
 type LatLng = { lat: number; lng: number };
 
 const MARKER_ANIMATION_MS = 800;
+const ROTATABLE_CLASS = "rt-arrow-inner";
 
 // Ease-out: fast start, gentle settle -- reads as a glide rather than the
 // jarring snap of setting a new lat/lng instantly, and rather than a robotic
@@ -25,21 +31,51 @@ function easeOutQuad(t: number): number {
   return t * (2 - t);
 }
 
+// Shortest signed angular distance from `from` to `to`, e.g. 350 -> 10
+// yields +20 (not -340) so a rotating arrow always turns the short way
+// around instead of spinning almost a full circle.
+function shortestAngleDelta(from: number, to: number): number {
+  let delta = (to - from) % 360;
+  if (delta > 180) delta -= 360;
+  if (delta < -180) delta += 360;
+  return delta;
+}
+
+function buildIconHtml(marker: MapMarker): string {
+  if (marker.shape === "arrow") {
+    const deg = marker.heading ?? 0;
+    // Kite/chevron shape pointing "up" (north) at 0deg -- CSS rotate() is
+    // clockwise-positive, matching the compass-bearing convention used
+    // throughout this app, so no sign-flipping is needed here.
+    return `<div class="${ROTATABLE_CLASS}" style="width:100%;height:100%;transform:rotate(${deg}deg);transform-origin:50% 50%;">
+      <svg viewBox="0 0 24 24" width="28" height="28">
+        <path d="M12 2 L19 21 L12 17 L5 21 Z" fill="${marker.color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+    </div>`;
+  }
+  return `<div style="width:18px;height:18px;border-radius:50%;background:${marker.color};border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`;
+}
+
 function animateMarkerTo(
   marker: Leaflet.Marker,
   to: LatLng,
+  rotation: { el: HTMLElement; fromDeg: number; toDeg: number } | null,
   durationMs: number,
   onFrame: (frameId: number) => void
 ) {
   const from = marker.getLatLng();
   const fromLat = from.lat;
   const fromLng = from.lng;
+  const rotationDelta = rotation ? shortestAngleDelta(rotation.fromDeg, rotation.toDeg) : 0;
   const start = performance.now();
 
   function step(now: number) {
     const t = Math.min((now - start) / durationMs, 1);
     const eased = easeOutQuad(t);
     marker.setLatLng([fromLat + (to.lat - fromLat) * eased, fromLng + (to.lng - fromLng) * eased]);
+    if (rotation) {
+      rotation.el.style.transform = `rotate(${rotation.fromDeg + rotationDelta * eased}deg)`;
+    }
     if (t < 1) {
       onFrame(requestAnimationFrame(step));
     }
@@ -69,6 +105,9 @@ export function TrackingMap({
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const markerAnimRefs = useRef<Record<string, number>>({});
+  // Last commanded rotation per arrow marker, used as the animation's
+  // starting angle for the next update (see shortestAngleDelta above).
+  const markerHeadingRefs = useRef<Record<string, number>>({});
   const hasFitRef = useRef(false);
   const routeLineRef = useRef<Leaflet.Polyline | null>(null);
   const lastRouteFetchRef = useRef<{ at: number; from: LatLng | null }>({ at: 0, from: null });
@@ -114,6 +153,7 @@ export function TrackingMap({
       cancelled = true;
       Object.values(markerAnimRefs.current).forEach(cancelAnimationFrame);
       markerAnimRefs.current = {};
+      markerHeadingRefs.current = {};
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -133,18 +173,38 @@ export function TrackingMap({
       if (existing) {
         const prevFrame = markerAnimRefs.current[marker.id];
         if (prevFrame) cancelAnimationFrame(prevFrame);
-        animateMarkerTo(existing, { lat: marker.lat, lng: marker.lng }, MARKER_ANIMATION_MS, (frameId) => {
-          markerAnimRefs.current[marker.id] = frameId;
-        });
+
+        let rotation: { el: HTMLElement; fromDeg: number; toDeg: number } | null = null;
+        if (marker.shape === "arrow" && marker.heading != null) {
+          const el = existing.getElement()?.querySelector<HTMLElement>(`.${ROTATABLE_CLASS}`);
+          if (el) {
+            const fromDeg = markerHeadingRefs.current[marker.id] ?? marker.heading;
+            rotation = { el, fromDeg, toDeg: marker.heading };
+            markerHeadingRefs.current[marker.id] = marker.heading;
+          }
+        }
+
+        animateMarkerTo(
+          existing,
+          { lat: marker.lat, lng: marker.lng },
+          rotation,
+          MARKER_ANIMATION_MS,
+          (frameId) => {
+            markerAnimRefs.current[marker.id] = frameId;
+          }
+        );
       } else {
+        const isArrow = marker.shape === "arrow";
+        const size = isArrow ? 28 : 18;
         const icon = L.divIcon({
           className: "",
-          html: `<div style="width:18px;height:18px;border-radius:50%;background:${marker.color};border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
+          html: buildIconHtml(marker),
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
         });
         const m = L.marker([marker.lat, marker.lng], { icon }).addTo(map);
         markerRefs.current[marker.id] = m;
+        if (isArrow) markerHeadingRefs.current[marker.id] = marker.heading ?? 0;
       }
     }
 

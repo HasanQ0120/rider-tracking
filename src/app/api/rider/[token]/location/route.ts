@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadActiveRiderToken, getDeviceLock, isActiveSession } from "@/lib/rider/shared";
-import { computeSpeedKmh, isSpeedImplausible } from "@/lib/geo";
+import { computeSpeedKmh, isSpeedImplausible, computeBearing } from "@/lib/geo";
 import { MAX_ACCURACY_M, LOCATION_MIN_INTERVAL_MS } from "@/lib/config";
 
 export async function POST(
@@ -69,6 +69,7 @@ export async function POST(
 
   let speedKmh: number | null = null;
   let speedImplausible = false;
+  let heading: number | null = null;
   if (previous) {
     speedKmh = computeSpeedKmh(
       previous.lat,
@@ -83,6 +84,10 @@ export async function POST(
     // signal to look at, catching obvious teleports while still tolerating
     // fast-but-real movement in traffic.
     speedImplausible = isSpeedImplausible(speedKmh);
+    // Computed once here (not separately by each viewer) so the rider's own
+    // page and the customer's page always agree on which way the arrow
+    // points.
+    heading = computeBearing(previous.lat, previous.lng, lat, lng);
   }
 
   await supabase.from("current_locations").upsert({
@@ -92,6 +97,7 @@ export async function POST(
     accuracy_m,
     speed_kmh: speedKmh,
     speed_implausible: speedImplausible,
+    heading,
     session_id,
     recorded_at: now.toISOString(),
   });
@@ -109,5 +115,5 @@ export async function POST(
     await supabase.from("orders").update({ status: "in_transit" }).eq("id", order.id);
   }
 
-  return NextResponse.json({ status: "ok", speedImplausible });
+  return NextResponse.json({ status: "ok", speedImplausible, heading });
 }

@@ -51,6 +51,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const [waitingForAccuracy, setWaitingForAccuracy] = useState(false);
   const [arrivedTapped, setArrivedTapped] = useState(false);
   const [ownPosition, setOwnPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [ownHeading, setOwnHeading] = useState<number | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [arrivedBusy, setArrivedBusy] = useState(false);
@@ -159,6 +160,10 @@ export function RiderTrackingClient({ token }: { token: string }) {
           case "ok":
             setWaitingForAccuracy(false);
             setOwnPosition({ lat, lng });
+            // Computed server-side (from consecutive points on the same
+            // order) rather than in the browser, so the rider's own arrow
+            // and the customer's copy of it always agree.
+            if (typeof data.heading === "number") setOwnHeading(data.heading);
             break;
           case "inaccurate":
             setWaitingForAccuracy(true);
@@ -331,7 +336,14 @@ export function RiderTrackingClient({ token }: { token: string }) {
     });
   }
   if (ownPosition) {
-    markers.push({ id: "self", lat: ownPosition.lat, lng: ownPosition.lng, color: MARKER_COLOR_RIDER });
+    markers.push({
+      id: "self",
+      lat: ownPosition.lat,
+      lng: ownPosition.lng,
+      color: MARKER_COLOR_RIDER,
+      shape: "arrow",
+      heading: ownHeading,
+    });
   }
   const defaultCenter: [number, number] = order?.delivery_lng
     ? [order.delivery_lat!, order.delivery_lng]
