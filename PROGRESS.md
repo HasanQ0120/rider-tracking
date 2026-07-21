@@ -30,9 +30,10 @@ white palette with hardcoded gold-button-navy-text contrast rule).
   issues it caught: mutable `search_path` on all functions, and
   SECURITY DEFINER functions being callable directly by `anon`/`authenticated`
   via PostgREST RPC (now revoked, service_role only).
-- Ops login provisioned: **waqar246@gmail.com / Rider-Tracking-Ops-2026**
-  (Supabase Auth user + matching `ops_staff` row). Change the password later
-  via Supabase Auth if you want.
+- Ops login provisioned: `waqar246@gmail.com` (Supabase Auth user + matching
+  `ops_staff` row). Password was set during setup and isn't recorded here on
+  purpose -- check/reset it via the Supabase dashboard's Auth > Users panel
+  if needed, rather than keeping a real credential in this file.
 
 **App (Next.js 16, App Router, TypeScript, Tailwind v4)**
 - `src/lib/` — config constants, Supabase clients (service/browser/auth),
@@ -47,7 +48,8 @@ white palette with hardcoded gold-button-navy-text contrast rule).
   short-lived JWT for Realtime auth, re-minted every 10 min) and complete
   (server-enforced arrival/proximity gate, not just a hidden UI button).
 - Ops panel: `/ops/login`, `/ops` (orders list), `/ops/orders/new`
-  (Mapbox geocoding-based address picker), `/ops/orders/[id]` (assign with
+  (Nominatim-based address picker, proxied server-side via `/api/geocode`),
+  `/ops/orders/[id]` (assign with
   reassignment confirmation, reset-tracking-session, cancel), `/ops/riders`.
   Gated by `middleware.ts` (session check) + `requireOpsUser()` /
   `requireOpsUserApi()` (ops_staff membership check).
@@ -55,11 +57,20 @@ white palette with hardcoded gold-button-navy-text contrast rule).
 
 ## What's still pending
 
-1. **Mapbox token not set.** `.env.local`'s `NEXT_PUBLIC_MAPBOX_TOKEN` is
-   still blank — maps will not render until a token from
-   account.mapbox.com/access-tokens is pasted in. Everything else in
-   `.env.local` (Supabase URL/anon key/service role key/JWT secret) is filled
-   in.
+1. **Map tiles use the raw public OSM server by deliberate, accepted risk.**
+   `TrackingMap.tsx` loads tiles from `tile.openstreetmap.org` directly — no
+   API key, no account, works out of the box. The tradeoff: that server
+   offers no SLA and can block access without notice if traffic looks
+   automated (checked Stadia Maps and MapTiler as alternatives first — both
+   explicitly ban commercial use on their free tiers, requiring a paid plan
+   from day one; this was a deliberate choice to accept the raw-server risk
+   instead). If tiles ever stop loading, the fix is swapping the one
+   `L.tileLayer(...)` URL in `TrackingMap.tsx` for a paid host (Stadia
+   Starter, $20/mo, already scoped). No env var needed for tiles anymore.
+   Geocoding (address search on `/ops/orders/new`) is separately proxied
+   through `/api/geocode` to Nominatim — set `NOMINATIM_USER_AGENT` in
+   `.env.local` to a real contact before going live (Nominatim's policy
+   requires an identifying value, not the placeholder default).
 2. **Never actually run yet.** `npm run dev` has not been started against
    live data — no real end-to-end pass (create order → assign rider → open
    rider link → PIN → simulate GPS via DevTools → watch customer map update
@@ -87,8 +98,8 @@ npm run dev
 
 Then:
 1. Open http://localhost:3000/ops/login, sign in with the credentials above.
-2. Add a rider (`/ops/riders`), create an order (`/ops/orders/new` — needs
-   the Mapbox token filled in to geocode the address), assign the rider to
+2. Add a rider (`/ops/riders`), create an order (`/ops/orders/new` —
+   geocodes the address via Nominatim, no key needed), assign the rider to
    it.
 3. **Known friction point for local testing:** the console stub
    (`src/lib/notify/providers/console.ts`) masks tokens/PINs before printing

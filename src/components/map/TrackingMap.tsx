@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import { useEffect, useRef, useState } from "react";
+import type * as Leaflet from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export type MapMarker = {
   id: string;
@@ -20,29 +20,57 @@ export function TrackingMap({
   defaultCenter,
 }: {
   markers: MapMarker[];
+  // Leaflet-native order: [lat, lng] (not Mapbox's [lng, lat]).
   defaultCenter: [number, number];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRefs = useRef<Record<string, mapboxgl.Marker>>({});
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const leafletRef = useRef<typeof Leaflet | null>(null);
+  const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const hasFitRef = useRef(false);
+  // Forces the marker effect below to re-run once the async Leaflet import
+  // + map creation finish -- without this, a caller whose `markers` prop
+  // doesn't change again after mount (e.g. a one-shot address preview)
+  // could load before the map exists and never actually get drawn.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token || !containerRef.current) return;
-    mapboxgl.accessToken = token;
+    if (!containerRef.current) return;
+    let cancelled = false;
 
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: defaultCenter,
-      zoom: 14,
+    // Leaflet touches `window` at module-evaluation time, which crashes
+    // during Next.js's server-side render of this "use client" component.
+    // A dynamic import here only ever runs inside this browser-only effect,
+    // never during SSR.
+    import("leaflet").then((mod) => {
+      if (cancelled || !containerRef.current) return;
+      const L = mod.default ?? mod;
+      leafletRef.current = L;
+
+      const map = L.map(containerRef.current, {
+        center: defaultCenter,
+        zoom: 14,
+        attributionControl: true,
+      });
+      mapRef.current = map;
+
+      // Raw public OSM tile server, used with a deliberate, accepted risk of
+      // unannounced blocking (no SLA) -- see the "Swap Mapbox -> Leaflet"
+      // plan/PROGRESS.md for why. Not a bug to "fix" by routing through a
+      // paid host later without discussion.
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(map);
+
+      setReady(true);
     });
-    mapRef.current = map;
 
     return () => {
-      map.remove();
+      cancelled = true;
+      mapRef.current?.remove();
       mapRef.current = null;
+      leafletRef.current = null;
       markerRefs.current = {};
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,23 +78,21 @@ export function TrackingMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    const L = leafletRef.current;
+    if (!map || !L) return;
 
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
-        existing.setLngLat([marker.lng, marker.lat]);
+        existing.setLatLng([marker.lat, marker.lng]);
       } else {
-        const el = document.createElement("div");
-        el.style.width = "18px";
-        el.style.height = "18px";
-        el.style.borderRadius = "50%";
-        el.style.background = marker.color;
-        el.style.border = "3px solid white";
-        el.style.boxShadow = "0 1px 4px rgba(0,0,0,0.4)";
-        const m = new mapboxgl.Marker({ element: el })
-          .setLngLat([marker.lng, marker.lat])
-          .addTo(map);
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="width:18px;height:18px;border-radius:50%;background:${marker.color};border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        });
+        const m = L.marker([marker.lat, marker.lng], { icon }).addTo(map);
         markerRefs.current[marker.id] = m;
       }
     }
@@ -74,14 +100,13 @@ export function TrackingMap({
     if (!hasFitRef.current && markers.length > 0) {
       hasFitRef.current = true;
       if (markers.length === 1) {
-        map.setCenter([markers[0].lng, markers[0].lat]);
+        map.setView([markers[0].lat, markers[0].lng], map.getZoom());
       } else {
-        const bounds = new mapboxgl.LngLatBounds();
-        markers.forEach((m) => bounds.extend([m.lng, m.lat]));
-        map.fitBounds(bounds, { padding: 60, maxZoom: 16 });
+        const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng]));
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
       }
     }
-  }, [markers]);
+  }, [markers, ready]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

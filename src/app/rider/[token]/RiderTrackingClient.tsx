@@ -298,7 +298,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
     markers.push({ id: "self", lat: ownPosition.lat, lng: ownPosition.lng, color: "#FFD700" });
   }
   const defaultCenter: [number, number] = order?.delivery_lng
-    ? [order.delivery_lng, order.delivery_lat!]
+    ? [order.delivery_lat!, order.delivery_lng]
     : [0, 0];
 
   return (

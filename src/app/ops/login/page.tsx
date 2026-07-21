@@ -16,15 +16,22 @@ export default function OpsLoginPage() {
   async function submit() {
     setLoading(true);
     setError(null);
-    const supabase = createAuthBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (signInError) {
-      setError(signInError.message);
-      return;
+    try {
+      const supabase = createAuthBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setError(signInError.message || "Sign-in failed. Please try again.");
+        return;
+      }
+      router.push("/ops");
+      router.refresh();
+    } catch {
+      // A thrown (not returned) error -- e.g. a network failure -- would
+      // otherwise fail silently with no user-facing feedback at all.
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-    router.push("/ops");
-    router.refresh();
   }
 
   return (

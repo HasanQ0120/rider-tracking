@@ -163,9 +163,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     markers.push({ id: "rider", lat: loc.lat, lng: loc.lng, color: "#FFD700" });
   }
   const defaultCenter: [number, number] = order.delivery_lng
-    ? [order.delivery_lng, order.delivery_lat!]
+    ? [order.delivery_lat!, order.delivery_lng]
     : loc
-      ? [loc.lng, loc.lat]
+      ? [loc.lat, loc.lng]
       : [0, 0];
 
   return (
