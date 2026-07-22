@@ -12,6 +12,13 @@ import { TrackingMap } from "@/components/map/TrackingMap";
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
 
+// Fallback starting viewport before any address has been searched or
+// clicked -- purely a starting point for panning/zooming, not a business
+// rule. Centered on Gulshan-e-Iqbal, Karachi, matching where this app has
+// actually been field-tested; change freely if the real service area
+// differs.
+const DEFAULT_MAP_CENTER: [number, number] = [24.9204, 67.0946];
+
 // Nominatim can return multiple candidates with the identical display_name
 // (e.g. a landmark spanning several address ranges) -- placeName alone
 // isn't a safe React key or <select> value, so combine it with coordinates.
@@ -57,6 +64,26 @@ export function NewOrderForm() {
       setSearching(false);
       setSearched(true);
     }
+  }
+
+  // Dragging fine-tunes an existing pin by a few meters -- keep whatever
+  // label it already had (search result text, or a prior manual label),
+  // only the coordinates move.
+  function handlePinDrag(_id: string, lat: number, lng: number) {
+    setSelected((prev) => (prev ? { ...prev, lat, lng } : prev));
+  }
+
+  // A map click can jump anywhere, bypassing search entirely -- treat it as
+  // a fresh manual placement. Use whatever's currently typed in the search
+  // box as the label if there is any, since ops often types an address
+  // before giving up on search results; otherwise fall back to the
+  // coordinates themselves so delivery_address is never left blank.
+  function handleMapClick(lat: number, lng: number) {
+    setSelected({
+      placeName: address.trim() || `Custom location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+      lat,
+      lng,
+    });
   }
 
   async function submit() {
@@ -128,7 +155,7 @@ export function NewOrderForm() {
 
           {searched && !searching && candidates.length === 0 && (
             <StatusBanner tone="warning">
-              No matching address found. Try a more specific search (e.g. include city/area).
+              No matching address found. You can place the pin manually on the map below instead.
             </StatusBanner>
           )}
 
@@ -149,16 +176,33 @@ export function NewOrderForm() {
                   </option>
                 ))}
               </Select>
-              {selected && (
-                <div className="h-64 animate-fade-in overflow-hidden rounded-lg border border-brand-navy/10 shadow-sm">
-                  <TrackingMap
-                    markers={[{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#0A192F" }]}
-                    defaultCenter={[selected.lat, selected.lng]}
-                  />
-                </div>
-              )}
             </div>
           )}
+
+          <div className="space-y-2">
+            <label className="block text-xs text-brand-navy/60">
+              {selected
+                ? "Drag the pin to fine-tune its exact position, or click elsewhere to move it."
+                : "Or click anywhere on the map to place the delivery pin manually."}
+            </label>
+            <div className="h-80 overflow-hidden rounded-lg border border-brand-navy/10 shadow-sm">
+              <TrackingMap
+                markers={
+                  selected
+                    ? [{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#0A192F", draggable: true }]
+                    : []
+                }
+                defaultCenter={selected ? [selected.lat, selected.lng] : DEFAULT_MAP_CENTER}
+                onMapClick={handleMapClick}
+                onMarkerDrag={handlePinDrag}
+              />
+            </div>
+            {selected && (
+              <p className="text-xs text-brand-navy/50">
+                Pin: {selected.lat.toFixed(5)}, {selected.lng.toFixed(5)}
+              </p>
+            )}
+          </div>
         </div>
       </Card>
 

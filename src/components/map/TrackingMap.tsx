@@ -17,6 +17,9 @@ export type MapMarker = {
   // clockwise) -- used for the rider's marker, never the delivery address.
   shape?: "dot" | "arrow";
   heading?: number | null;
+  // Opt-in per marker -- only the ops "New Order" address pin sets this.
+  // Rider/customer markers never do, so their behavior is unaffected.
+  draggable?: boolean;
 };
 
 type LatLng = { lat: number; lng: number };
@@ -91,6 +94,8 @@ export function TrackingMap({
   defaultCenter,
   routeFrom,
   routeTo,
+  onMapClick,
+  onMarkerDrag,
 }: {
   markers: MapMarker[];
   // Leaflet-native order: [lat, lng] (not Mapbox's [lng, lat]).
@@ -99,12 +104,22 @@ export function TrackingMap({
   // via OSRM. Omit or pass null on either end to hide the line.
   routeFrom?: LatLng | null;
   routeTo?: LatLng | null;
+  // Both opt-in, used only by the ops "New Order" address picker. Neither
+  // is passed by the rider/customer pages, so clicking or dragging on
+  // their maps does nothing extra.
+  onMapClick?: (lat: number, lng: number) => void;
+  onMarkerDrag?: (id: string, lat: number, lng: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const markerAnimRefs = useRef<Record<string, number>>({});
+  // Refs (not the props directly) so the map-click listener and each
+  // marker's dragend listener -- both attached once, at creation time --
+  // always call the latest callback instead of a stale closure.
+  const onMapClickRef = useRef(onMapClick);
+  const onMarkerDragRef = useRef(onMarkerDrag);
   // Last commanded rotation per arrow marker, used as the animation's
   // starting angle for the next update (see shortestAngleDelta above).
   const markerHeadingRefs = useRef<Record<string, number>>({});
@@ -116,6 +131,14 @@ export function TrackingMap({
   // doesn't change again after mount (e.g. a one-shot address preview)
   // could load before the map exists and never actually get drawn.
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
+  useEffect(() => {
+    onMarkerDragRef.current = onMarkerDrag;
+  }, [onMarkerDrag]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -146,6 +169,10 @@ export function TrackingMap({
         maxZoom: 19,
       }).addTo(map);
 
+      map.on("click", (e: Leaflet.LeafletMouseEvent) => {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      });
+
       setReady(true);
     });
 
@@ -171,6 +198,15 @@ export function TrackingMap({
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
+        // Skip re-animating a marker that's already sitting at its target --
+        // e.g. right after the user's own drag already put it exactly there
+        // (see dragend below), where re-animating A -> A would be pointless
+        // and could visually fight an in-progress native drag.
+        const current = existing.getLatLng();
+        if (Math.abs(current.lat - marker.lat) < 1e-9 && Math.abs(current.lng - marker.lng) < 1e-9) {
+          continue;
+        }
+
         const prevFrame = markerAnimRefs.current[marker.id];
         if (prevFrame) cancelAnimationFrame(prevFrame);
 
@@ -202,7 +238,15 @@ export function TrackingMap({
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
         });
-        const m = L.marker([marker.lat, marker.lng], { icon }).addTo(map);
+        const m = L.marker([marker.lat, marker.lng], { icon, draggable: marker.draggable ?? false }).addTo(
+          map
+        );
+        if (marker.draggable) {
+          m.on("dragend", () => {
+            const pos = m.getLatLng();
+            onMarkerDragRef.current?.(marker.id, pos.lat, pos.lng);
+          });
+        }
         markerRefs.current[marker.id] = m;
         if (isArrow) markerHeadingRefs.current[marker.id] = marker.heading ?? 0;
       }
