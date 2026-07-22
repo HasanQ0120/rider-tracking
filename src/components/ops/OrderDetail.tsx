@@ -122,7 +122,7 @@ export function OrderDetail({
   }
 
   return (
-    <div className="max-w-2xl animate-slide-up space-y-6">
+    <div className="mx-auto max-w-2xl animate-slide-up space-y-6">
       <div>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-brand-navy">{order.customer_name}</h1>
