@@ -35,11 +35,11 @@ export async function POST(
     return NextResponse.json({ status: "invalid" }, { status: 404 });
   }
 
-  let rider: { name: string; phone: string } | null = null;
+  let rider: { name: string; phone: string; license_plate: string | null } | null = null;
   if (order.assigned_rider_id) {
     const { data } = await supabase
       .from("riders")
-      .select("name, phone")
+      .select("name, phone, license_plate")
       .eq("id", order.assigned_rider_id)
       .single();
     rider = data ?? null;

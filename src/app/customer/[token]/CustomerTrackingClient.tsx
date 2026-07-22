@@ -29,7 +29,7 @@ type OrderInfo = {
   delivery_confirmed_by?: string | null;
   review_flag_reason?: string | null;
 };
-type Rider = { name: string; phone: string } | null;
+type Rider = { name: string; phone: string; license_plate: string | null } | null;
 type Loc = {
   lat: number;
   lng: number;
@@ -285,18 +285,42 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
         />
       </div>
-      <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
+      <div className="border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
         {rider && (
-          <div className="animate-fade-in">
-            <CallButton phone={rider.phone} label="Call Rider" />
+          // Mobile: sits in the normal flow, above the call/complete row, at
+          // the bottom of the screen -- the inDrive-style "driver card"
+          // spot. Desktop (md+): pulled out of that flow and floated over
+          // the map instead, near the top-left; a placeholder position,
+          // fine to move once this is visible on an actual desktop screen.
+          // z-[2000] matches ConfirmDialog's -- Leaflet's own panes/controls
+          // carry z-index up to 1000 and escape into the root stacking
+          // context, so anything meant to sit above the map needs to clear
+          // that, not just Tailwind's default scale.
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-brand-navy/10 bg-brand-navy/5 p-3 animate-slide-up md:fixed md:left-4 md:top-20 md:z-[2000] md:mb-0 md:w-64 md:border-brand-navy/10 md:bg-white md:shadow-lg">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-brand-navy/50">Your courier</p>
+              <p className="text-base font-semibold text-brand-navy">{rider.name}</p>
+            </div>
+            {rider.license_plate && (
+              <p className="rounded-md bg-brand-navy px-2 py-1 text-xs font-semibold tracking-wide text-white">
+                {rider.license_plate}
+              </p>
+            )}
           </div>
         )}
-        {canComplete && (
-          <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
-            {completing && <Spinner className="h-4 w-4" />}
-            Complete
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {rider && (
+            <div className="animate-fade-in">
+              <CallButton phone={rider.phone} label="Call Rider" />
+            </div>
+          )}
+          {canComplete && (
+            <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
+              {completing && <Spinner className="h-4 w-4" />}
+              Complete
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

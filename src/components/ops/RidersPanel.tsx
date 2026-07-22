@@ -8,12 +8,20 @@ import { Spinner } from "@/components/ui/Spinner";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 import { scrollToError } from "@/lib/scrollToError";
 
-type Rider = { id: string; name: string; phone: string; active: boolean; created_at: string };
+type Rider = {
+  id: string;
+  name: string;
+  phone: string;
+  license_plate: string | null;
+  active: boolean;
+  created_at: string;
+};
 
 export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
   const [riders, setRiders] = useState(initialRiders);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [licensePlate, setLicensePlate] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +40,11 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
     const res = await fetch("/api/ops/riders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone: cleanPhoneInput(phone) }),
+      body: JSON.stringify({
+        name,
+        phone: cleanPhoneInput(phone),
+        license_plate: licensePlate.trim(),
+      }),
     });
     const data = await res.json();
     setSubmitting(false);
@@ -40,6 +52,7 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
       setRiders([data.rider, ...riders]);
       setName("");
       setPhone("");
+      setLicensePlate("");
     } else if (data.status === "invalid_phone") {
       showPhoneError(PK_MOBILE_HINT);
     }
@@ -72,7 +85,12 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
               </p>
             )}
           </div>
-          <Button onClick={addRider} disabled={submitting || !name || !phone}>
+          <Input
+            placeholder="License plate (e.g. ABC-123)"
+            value={licensePlate}
+            onChange={(e) => setLicensePlate(e.target.value)}
+          />
+          <Button onClick={addRider} disabled={submitting || !name || !phone || !licensePlate.trim()}>
             {submitting && <Spinner className="h-4 w-4" />}
             Add Rider
           </Button>
@@ -91,7 +109,10 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
               className="animate-fade-in flex justify-between border-b border-brand-navy/10 px-4 py-3 transition-colors last:border-b-0 hover:bg-brand-navy/5"
             >
               <span className="font-medium text-brand-navy">{r.name}</span>
-              <span className="text-brand-navy/60">{r.phone}</span>
+              <span className="text-right text-brand-navy/60">
+                {r.phone}
+                {r.license_plate && <span className="block text-xs">{r.license_plate}</span>}
+              </span>
             </div>
           ))}
         </div>

@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("riders")
-    .select("id, name, phone, active, created_at")
+    .select("id, name, phone, license_plate, active, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
@@ -21,8 +21,8 @@ export async function POST(req: Request) {
   const guard = await requireOpsUserApi();
   if ("error" in guard) return guard.error;
 
-  const { name, phone } = await req.json();
-  if (!name || !phone) {
+  const { name, phone, license_plate } = await req.json();
+  if (!name || !phone || !license_plate) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
   if (!isValidPakistaniMobile(phone)) {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("riders")
-    .insert({ name, phone: cleanPhoneInput(phone) })
+    .insert({ name, phone: cleanPhoneInput(phone), license_plate })
     .select()
     .single();
 

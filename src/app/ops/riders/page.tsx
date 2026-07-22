@@ -7,7 +7,7 @@ export default async function RidersPage() {
   const supabase = createServiceClient();
   const { data: riders } = await supabase
     .from("riders")
-    .select("id, name, phone, active, created_at")
+    .select("id, name, phone, license_plate, active, created_at")
     .order("created_at", { ascending: false });
 
   return (
