@@ -37,8 +37,17 @@ export async function GET(req: Request) {
   const userAgent =
     process.env.NOMINATIM_USER_AGENT ?? "RiderTracking/1.0 (ops contact: not-configured)";
 
+  // Short/ambiguous queries (e.g. a housing-scheme name that exists in
+  // several cities) can otherwise match a same-named place in an entirely
+  // different region -- restricting to the actual country(ies) of
+  // operation is the single biggest accuracy improvement Nominatim's API
+  // supports for this. Comma-separated ISO 3166-1 alpha-2 codes; unset
+  // means unrestricted (global) search, same as before this env var existed.
+  const countryCodes = process.env.NOMINATIM_COUNTRY_CODES;
+  const countryParam = countryCodes ? `&countrycodes=${encodeURIComponent(countryCodes)}` : "";
+
   const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1${countryParam}`,
     { headers: { "User-Agent": userAgent } }
   );
 

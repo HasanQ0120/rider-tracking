@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadActiveRiderToken, getDeviceLock, isActiveSession } from "@/lib/rider/shared";
-import { computeSpeedKmh, isSpeedImplausible, computeBearing } from "@/lib/geo";
-import { MAX_ACCURACY_M, LOCATION_MIN_INTERVAL_MS } from "@/lib/config";
+import { computeSpeedKmh, isSpeedImplausible, computeBearing, haversineMeters } from "@/lib/geo";
+import { MAX_ACCURACY_M, LOCATION_MIN_INTERVAL_MS, MIN_HEADING_UPDATE_DISTANCE_M } from "@/lib/config";
 
 export async function POST(
   req: Request,
@@ -55,7 +55,7 @@ export async function POST(
 
   const { data: previous } = await supabase
     .from("current_locations")
-    .select("lat, lng, recorded_at")
+    .select("lat, lng, recorded_at, heading")
     .eq("order_id", order.id)
     .maybeSingle();
 
@@ -84,10 +84,18 @@ export async function POST(
     // signal to look at, catching obvious teleports while still tolerating
     // fast-but-real movement in traffic.
     speedImplausible = isSpeedImplausible(speedKmh);
+
     // Computed once here (not separately by each viewer) so the rider's own
     // page and the customer's page always agree on which way the arrow
-    // points.
-    heading = computeBearing(previous.lat, previous.lng, lat, lng);
+    // points. Below MIN_HEADING_UPDATE_DISTANCE_M, treat the apparent
+    // movement as GPS noise and keep the previous heading rather than
+    // recomputing one from a near-zero-length vector, which is what made
+    // the arrow spin/jitter while the rider was stationary or barely moving.
+    const movedMeters = haversineMeters(previous.lat, previous.lng, lat, lng);
+    heading =
+      movedMeters >= MIN_HEADING_UPDATE_DISTANCE_M
+        ? computeBearing(previous.lat, previous.lng, lat, lng)
+        : previous.heading ?? null;
   }
 
   await supabase.from("current_locations").upsert({

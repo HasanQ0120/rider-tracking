@@ -10,7 +10,7 @@ export default async function OpsOrdersPage() {
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id, customer_name, delivery_address, status, tracking_expired_unresolved, delivery_confirmed_by, created_at, riders:assigned_rider_id(name)"
+      "id, customer_name, delivery_address, status, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, created_at, riders:assigned_rider_id(name)"
     )
     .order("created_at", { ascending: false });
 

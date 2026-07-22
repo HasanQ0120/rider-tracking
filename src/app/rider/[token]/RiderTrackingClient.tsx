@@ -28,7 +28,9 @@ type Screen =
   | "tracking"
   | "permission_denied"
   | "session_moved"
-  | "completed";
+  | "completed"
+  | "pending_confirmation"
+  | "flagged";
 
 type OrderInfo = {
   id: string;
@@ -186,6 +188,18 @@ export function RiderTrackingClient({ token }: { token: string }) {
             if (intervalRef.current) clearInterval(intervalRef.current);
             setScreen("completed");
             break;
+          case "invalid":
+            // The token lookup itself failed -- this fires if the order was
+            // resolved through some other path (the customer's own
+            // independent Complete button, ops cancelling, etc.) while the
+            // rider was still actively sending updates: mark_order_delivered
+            // revokes the token in the same operation that closes the
+            // order, so this check trips before the order-status check
+            // even gets a chance to return "closed". Same end state either
+            // way, from the rider's perspective.
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            setScreen("completed");
+            break;
           default:
             break;
         }
@@ -235,8 +249,19 @@ export function RiderTrackingClient({ token }: { token: string }) {
     if (deliveredBusy) return;
     setDeliveredBusy(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
-    await postJson(`/api/rider/${token}/complete`, { device_key: deviceKeyRef.current });
-    setScreen("completed");
+    try {
+      // Tapping this no longer means "instantly delivered" -- the backend
+      // checks the rider's last known position against the delivery
+      // address (same PROXIMITY_RADIUS_M as "I've Arrived") and either
+      // hands off to the customer for a Yes/No confirmation, or flags the
+      // order for review immediately if too far away.
+      const { data } = await postJson(`/api/rider/${token}/complete`, {
+        device_key: deviceKeyRef.current,
+      });
+      setScreen(data.status === "flagged" ? "flagged" : "pending_confirmation");
+    } finally {
+      setDeliveredBusy(false);
+    }
   }, [token, deliveredBusy]);
 
   const requestResend = useCallback(async () => {
@@ -253,6 +278,22 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }
   if (screen === "completed") {
     return <CenteredMessage>This delivery has been completed. Thank you!</CenteredMessage>;
+  }
+  if (screen === "pending_confirmation") {
+    return (
+      <CenteredMessage>
+        Marked as delivered — waiting for the customer to confirm they received it. You&apos;re
+        done here; no need to keep this page open.
+      </CenteredMessage>
+    );
+  }
+  if (screen === "flagged") {
+    return (
+      <CenteredMessage>
+        This delivery was flagged for review — you were too far from the delivery address to
+        mark it complete automatically. Ops will follow up.
+      </CenteredMessage>
+    );
   }
   if (screen === "locked_out") {
     return (

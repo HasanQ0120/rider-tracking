@@ -44,7 +44,9 @@ export async function GET(
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, rider_arrived_at, tracking_expired_unresolved, delivery_confirmed_by")
+    .select(
+      "id, status, rider_arrived_at, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason"
+    )
     .eq("id", tokenRow.order_id)
     .single();
 

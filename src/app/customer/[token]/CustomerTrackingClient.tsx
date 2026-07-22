@@ -25,6 +25,7 @@ type OrderInfo = {
   rider_arrived_at: string | null;
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by?: string | null;
+  review_flag_reason?: string | null;
 };
 type Rider = { name: string; phone: string } | null;
 type Loc = { lat: number; lng: number; accuracy_m: number; heading: number | null; recorded_at: string };
@@ -36,6 +37,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const [loc, setLoc] = useState<Loc | null>(null);
   const [connectionLost, setConnectionLost] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -89,9 +91,15 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     };
   }, [loc]);
 
+  // The rider-initiated confirmation flow (pending_confirmation/
+  // flagged_review) replaces this generic button for those two states --
+  // it's still available independently otherwise, e.g. if the customer
+  // wants to confirm before the rider has tapped anything.
   const canComplete =
     order?.status !== "delivered" &&
     order?.status !== "cancelled" &&
+    order?.status !== "pending_confirmation" &&
+    order?.status !== "flagged_review" &&
     (Boolean(order?.rider_arrived_at) ||
       (loc &&
         order?.delivery_lat != null &&
@@ -109,6 +117,27 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     }
   }, [token, order]);
 
+  const respondToConfirmation = useCallback(
+    async (response: "yes" | "no") => {
+      if (confirming) return;
+      setConfirming(true);
+      try {
+        const res = await fetch(`/api/customer/${token}/confirm-delivery`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ response }),
+        });
+        const data = await res.json();
+        if (data.resolvedStatus && order) {
+          setOrder({ ...order, status: data.resolvedStatus });
+        }
+      } finally {
+        setConfirming(false);
+      }
+    },
+    [token, order, confirming]
+  );
+
   if (screen === "loading") return <CenteredMessage>Loading…</CenteredMessage>;
   if (screen === "invalid") {
     return <CenteredMessage>This tracking link is invalid.</CenteredMessage>;
@@ -123,6 +152,44 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
         <Card className="w-full max-w-sm animate-scale-in text-center">
           <StatusBanner tone="success">Your order has been delivered!</StatusBanner>
+        </Card>
+      </div>
+    );
+  }
+  if (order.status === "flagged_review") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+        <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
+          <StatusBanner tone="warning">
+            We&apos;re looking into this and will follow up shortly.
+          </StatusBanner>
+          {rider && <CallButton phone={rider.phone} label="Call Rider" />}
+        </Card>
+      </div>
+    );
+  }
+  if (order.status === "pending_confirmation") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+        <Card className="w-full max-w-sm animate-scale-in space-y-4 text-center">
+          <p className="text-brand-navy">
+            Your rider has marked this as delivered — did you receive your order?
+          </p>
+          <div className="flex gap-3">
+            <Button className="flex-1" onClick={() => respondToConfirmation("yes")} disabled={confirming}>
+              {confirming && <Spinner className="h-4 w-4" />}
+              Yes
+            </Button>
+            <Button
+              variant="accent-outline"
+              className="flex-1"
+              onClick={() => respondToConfirmation("no")}
+              disabled={confirming}
+            >
+              No
+            </Button>
+          </div>
+          {rider && <CallButton phone={rider.phone} label="Call Rider" />}
         </Card>
       </div>
     );

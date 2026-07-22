@@ -7,6 +7,7 @@ type OrderRow = {
   status: string;
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by: string | null;
+  review_flag_reason?: string | null;
   created_at: string;
   riders: { name: string } | { name: string }[] | null;
 };
@@ -21,8 +22,15 @@ const statusPillClasses: Record<string, string> = {
   assigned: "bg-status-warning/10 text-status-warning",
   in_transit: "bg-status-warning/10 text-status-warning",
   arrived: "bg-status-warning/10 text-status-warning",
+  pending_confirmation: "bg-status-warning/10 text-status-warning",
   delivered: "bg-status-success/10 text-status-success",
   cancelled: "bg-status-danger/10 text-status-danger",
+  flagged_review: "bg-status-danger/10 text-status-danger",
+};
+
+const flagReasonLabels: Record<string, string> = {
+  far_from_address: "far from address",
+  customer_rejected: "customer said not received",
 };
 
 export function OrdersTable({ orders }: { orders: OrderRow[] }) {
@@ -48,7 +56,12 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
         </thead>
         <tbody>
           {orders.map((o) => (
-            <tr key={o.id} className="border-t border-brand-navy/10 transition-colors hover:bg-brand-navy/5">
+            <tr
+              key={o.id}
+              className={`border-t border-brand-navy/10 transition-colors hover:bg-brand-navy/5 ${
+                o.status === "flagged_review" ? "bg-status-danger/5" : ""
+              }`}
+            >
               <td className="px-4 py-3">
                 <Link href={`/ops/orders/${o.id}`} className="font-medium text-brand-navy hover:underline">
                   {o.customer_name}
@@ -64,7 +77,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                 </span>
               </td>
               <td className="px-4 py-3">
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   {o.tracking_expired_unresolved && (
                     <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs text-status-warning">
                       link expired
@@ -73,6 +86,16 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                   {o.delivery_confirmed_by === "auto_location" && (
                     <span className="rounded-full bg-status-success/10 px-2 py-0.5 text-xs text-status-success">
                       auto-confirmed
+                    </span>
+                  )}
+                  {o.delivery_confirmed_by === "customer_timeout" && (
+                    <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs text-status-warning">
+                      no response — auto-confirmed
+                    </span>
+                  )}
+                  {o.review_flag_reason && (
+                    <span className="rounded-full bg-status-danger/10 px-2 py-0.5 text-xs text-status-danger">
+                      {flagReasonLabels[o.review_flag_reason] ?? o.review_flag_reason}
                     </span>
                   )}
                 </div>

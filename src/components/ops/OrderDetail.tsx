@@ -17,6 +17,7 @@ type Order = {
   assigned_rider_id: string | null;
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by: string | null;
+  review_flag_reason: string | null;
   rider_arrived_at: string | null;
   created_at: string;
   delivered_at: string | null;
@@ -37,8 +38,15 @@ const statusPillClasses: Record<string, string> = {
   assigned: "bg-status-warning/10 text-status-warning",
   in_transit: "bg-status-warning/10 text-status-warning",
   arrived: "bg-status-warning/10 text-status-warning",
+  pending_confirmation: "bg-status-warning/10 text-status-warning",
   delivered: "bg-status-success/10 text-status-success",
   cancelled: "bg-status-danger/10 text-status-danger",
+  flagged_review: "bg-status-danger/10 text-status-danger",
+};
+
+const flagReasonLabels: Record<string, string> = {
+  far_from_address: "Rider was too far from the delivery address when marking complete.",
+  customer_rejected: "Customer said they did not receive the order.",
 };
 
 export function OrderDetail({
@@ -121,12 +129,31 @@ export function OrderDetail({
           {order.delivery_confirmed_by === "auto_location" && (
             <StatusBanner tone="success">Auto-confirmed by sustained proximity to delivery address.</StatusBanner>
           )}
+          {order.delivery_confirmed_by === "customer_timeout" && (
+            <StatusBanner tone="warning">
+              Auto-confirmed after 30 minutes with no customer response (not a genuine confirmation).
+            </StatusBanner>
+          )}
+          {order.status === "flagged_review" && order.review_flag_reason && (
+            <StatusBanner tone="danger">
+              {flagReasonLabels[order.review_flag_reason] ?? order.review_flag_reason}
+            </StatusBanner>
+          )}
+          {order.status === "pending_confirmation" && (
+            <StatusBanner tone="warning">
+              Rider marked this complete near the delivery address — waiting on the customer to
+              confirm Yes/No (auto-resolves as delivered after 30 minutes with no response).
+            </StatusBanner>
+          )}
         </div>
       </div>
 
       {message && <StatusBanner tone="success">{message}</StatusBanner>}
 
-      {order.status !== "delivered" && order.status !== "cancelled" && (
+      {order.status !== "delivered" &&
+        order.status !== "cancelled" &&
+        order.status !== "pending_confirmation" &&
+        order.status !== "flagged_review" && (
         <Card title="Assign Rider">
           <div className="flex gap-2">
             <Select
