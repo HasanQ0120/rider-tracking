@@ -11,8 +11,8 @@ export default async function RidersPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="max-w-lg">
-      <h1 className="mb-4 text-xl font-semibold text-brand-navy">Riders</h1>
+    <div className="max-w-lg animate-slide-up">
+      <h1 className="mb-6 text-2xl font-semibold text-brand-navy">Riders</h1>
       <RidersPanel initialRiders={riders ?? []} />
     </div>
   );

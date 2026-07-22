@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { Card } from "@/components/ui/Card";
+import { Select } from "@/components/ui/Select";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Order = {
   id: string;
@@ -28,6 +31,15 @@ type TokenRow = {
   created_at: string;
 };
 type Rider = { id: string; name: string; phone: string };
+
+const statusPillClasses: Record<string, string> = {
+  pending: "bg-brand-navy/10 text-brand-navy",
+  assigned: "bg-status-warning/10 text-status-warning",
+  in_transit: "bg-status-warning/10 text-status-warning",
+  arrived: "bg-status-warning/10 text-status-warning",
+  delivered: "bg-status-success/10 text-status-success",
+  cancelled: "bg-status-danger/10 text-status-danger",
+};
 
 export function OrderDetail({
   order,
@@ -91,27 +103,34 @@ export function OrderDetail({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl animate-slide-up space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-brand-navy">{order.customer_name}</h1>
-        <p className="text-sm text-brand-navy/70">{order.delivery_address}</p>
-        <p className="mt-1 text-sm capitalize text-brand-navy">Status: {order.status.replace("_", " ")}</p>
-        {order.tracking_expired_unresolved && (
-          <StatusBanner tone="warning">Tracking link expired on this still-open order.</StatusBanner>
-        )}
-        {order.delivery_confirmed_by === "auto_location" && (
-          <StatusBanner tone="success">Auto-confirmed by sustained proximity to delivery address.</StatusBanner>
-        )}
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-brand-navy">{order.customer_name}</h1>
+          <span
+            className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium capitalize ${statusPillClasses[order.status] ?? "bg-brand-navy/10 text-brand-navy"}`}
+          >
+            {order.status.replace("_", " ")}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-brand-navy/70">{order.delivery_address}</p>
+        <div className="mt-3 space-y-2">
+          {order.tracking_expired_unresolved && (
+            <StatusBanner tone="warning">Tracking link expired on this still-open order.</StatusBanner>
+          )}
+          {order.delivery_confirmed_by === "auto_location" && (
+            <StatusBanner tone="success">Auto-confirmed by sustained proximity to delivery address.</StatusBanner>
+          )}
+        </div>
       </div>
 
       {message && <StatusBanner tone="success">{message}</StatusBanner>}
 
       {order.status !== "delivered" && order.status !== "cancelled" && (
-        <div className="rounded-lg border border-brand-navy/10 p-4">
-          <h2 className="mb-2 font-semibold text-brand-navy">Assign Rider</h2>
+        <Card title="Assign Rider">
           <div className="flex gap-2">
-            <select
-              className="flex-1 rounded-lg border border-brand-navy/30 px-3 py-2"
+            <Select
+              className="flex-1"
               value={selectedRider}
               onChange={(e) => setSelectedRider(e.target.value)}
             >
@@ -120,61 +139,62 @@ export function OrderDetail({
                   {r.name} — {r.phone}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button onClick={() => assign(false)} disabled={busy || !selectedRider}>
+              {busy && <Spinner className="h-4 w-4" />}
               {order.assigned_rider_id ? "Reassign" : "Assign"}
             </Button>
           </div>
           {needsConfirm && (
-            <div className="mt-3">
+            <div className="mt-3 animate-scale-in space-y-2">
               <StatusBanner tone="warning">
                 This order already has an active rider. Confirm to reassign — the current
                 rider&apos;s link will be revoked immediately.
               </StatusBanner>
-              <Button className="mt-2" onClick={() => assign(true)} disabled={busy}>
+              <Button onClick={() => assign(true)} disabled={busy}>
                 Confirm Reassignment
               </Button>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {(activeRiderToken || activeCustomerToken) && (
-        <div className="rounded-lg border border-brand-navy/10 p-4">
-          <h2 className="mb-2 font-semibold text-brand-navy">Active Links</h2>
-          {activeRiderToken && (
-            <p className="break-all text-sm">
-              Rider: {origin}/rider/{activeRiderToken.token}
-            </p>
-          )}
-          {activeCustomerToken && (
-            <p className="break-all text-sm">
-              Customer: {origin}/customer/{activeCustomerToken.token}
-            </p>
-          )}
-        </div>
+        <Card title="Active Links" className="animate-fade-in">
+          <div className="space-y-1.5">
+            {activeRiderToken && (
+              <p className="break-all text-sm text-brand-navy/80">
+                Rider: {origin}/rider/{activeRiderToken.token}
+              </p>
+            )}
+            {activeCustomerToken && (
+              <p className="break-all text-sm text-brand-navy/80">
+                Customer: {origin}/customer/{activeCustomerToken.token}
+              </p>
+            )}
+          </div>
+        </Card>
       )}
 
       {activeRiderToken && (
-        <div className="rounded-lg border border-brand-navy/10 p-4">
-          <h2 className="mb-2 font-semibold text-brand-navy">Device Swap</h2>
-          <p className="mb-2 text-sm text-brand-navy/70">
+        <Card title="Device Swap" className="animate-fade-in">
+          <p className="mb-3 text-sm text-brand-navy/70">
             If the rider&apos;s phone died or was swapped, reset the tracking session so the new
             device can verify the PIN.
           </p>
           <Button variant="accent-outline" onClick={resetSession} disabled={busy}>
             Reset Tracking Session
           </Button>
-        </div>
+        </Card>
       )}
 
       {order.status !== "delivered" && order.status !== "cancelled" && (
-        <div className="rounded-lg border border-status-danger/30 p-4">
-          <h2 className="mb-2 font-semibold text-status-danger">Cancel Order</h2>
+        <div className="rounded-xl border border-status-danger/30 bg-status-danger/5 p-5">
+          <h2 className="mb-3 font-semibold text-status-danger">Cancel Order</h2>
           <button
             onClick={cancelOrder}
             disabled={busy}
-            className="rounded-xl border-2 border-status-danger px-5 py-3 font-semibold text-status-danger"
+            className="rounded-xl border-2 border-status-danger px-5 py-3 font-semibold text-status-danger transition-all duration-150 hover:bg-status-danger/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Cancel Order
           </button>

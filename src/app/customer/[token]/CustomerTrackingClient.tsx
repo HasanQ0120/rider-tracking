@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { CallButton } from "@/components/ui/CallButton";
+import { Card } from "@/components/ui/Card";
+import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { haversineMeters } from "@/lib/geo";
 import {
@@ -118,8 +120,10 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   }
   if (order.status === "delivered") {
     return (
-      <div className="mx-auto max-w-md p-6 text-center">
-        <StatusBanner tone="success">Your order has been delivered!</StatusBanner>
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+        <Card className="w-full max-w-sm animate-scale-in text-center">
+          <StatusBanner tone="success">Your order has been delivered!</StatusBanner>
+        </Card>
       </div>
     );
   }
@@ -128,12 +132,14 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   // the order was ever marked delivered.
   if (order.tracking_expired_unresolved) {
     return (
-      <div className="mx-auto max-w-md p-6 text-center">
-        <StatusBanner tone="warning">
-          Tracking link expired. We&apos;re re-establishing the connection with your rider — this
-          page will resume automatically.
-        </StatusBanner>
-        {rider && <CallButton phone={rider.phone} label="Call Rider" />}
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+        <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
+          <StatusBanner tone="warning">
+            Tracking link expired. We&apos;re re-establishing the connection with your rider — this
+            page will resume automatically.
+          </StatusBanner>
+          {rider && <CallButton phone={rider.phone} label="Call Rider" />}
+        </Card>
       </div>
     );
   }
@@ -160,13 +166,13 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
   return (
     <div className="flex h-screen flex-col">
-      <div className="border-b border-brand-navy/10 bg-white p-3">
-        {connectionLost && (
+      {connectionLost && (
+        <div className="border-b border-brand-navy/10 bg-white p-3">
           <StatusBanner tone="danger">
             Connection lost — showing rider&apos;s last known position.
           </StatusBanner>
-        )}
-      </div>
+        </div>
+      )}
       <div className="flex-1">
         <TrackingMap
           markers={markers}
@@ -179,10 +185,15 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           }
         />
       </div>
-      <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4">
-        {rider && <CallButton phone={rider.phone} label="Call Rider" />}
+      <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
+        {rider && (
+          <div className="animate-fade-in">
+            <CallButton phone={rider.phone} label="Call Rider" />
+          </div>
+        )}
         {canComplete && (
-          <Button onClick={tapComplete} disabled={completing} className="flex-1">
+          <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
+            {completing && <Spinner className="h-4 w-4" />}
             Complete
           </Button>
         )}
@@ -193,8 +204,10 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen items-center justify-center p-6 text-center text-brand-navy">
-      {children}
+    <div className="flex h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="animate-scale-in max-w-sm rounded-xl border border-brand-navy/10 bg-white p-6 text-center text-brand-navy shadow-sm">
+        {children}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Rider = { id: string; name: string; phone: string; active: boolean; created_at: string };
 
@@ -29,33 +32,34 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-brand-navy/10 p-4">
-        <h2 className="mb-2 font-semibold text-brand-navy">Add Rider</h2>
-        <input
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mb-2 w-full rounded-lg border border-brand-navy/30 px-3 py-2"
-        />
-        <input
-          placeholder="Phone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="mb-2 w-full rounded-lg border border-brand-navy/30 px-3 py-2"
-        />
-        <Button onClick={addRider} disabled={submitting || !name || !phone}>
-          Add Rider
-        </Button>
-      </div>
+      <Card title="Add Rider">
+        <div className="space-y-3">
+          <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Button onClick={addRider} disabled={submitting || !name || !phone}>
+            {submitting && <Spinner className="h-4 w-4" />}
+            Add Rider
+          </Button>
+        </div>
+      </Card>
 
-      <div className="rounded-lg border border-brand-navy/10">
-        {riders.map((r) => (
-          <div key={r.id} className="flex justify-between border-b border-brand-navy/10 px-4 py-2 last:border-b-0">
-            <span>{r.name}</span>
-            <span className="text-brand-navy/60">{r.phone}</span>
-          </div>
-        ))}
-      </div>
+      {riders.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-brand-navy/20 p-8 text-center text-brand-navy/50">
+          No riders yet.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-brand-navy/10 shadow-sm">
+          {riders.map((r) => (
+            <div
+              key={r.id}
+              className="animate-fade-in flex justify-between border-b border-brand-navy/10 px-4 py-3 transition-colors last:border-b-0 hover:bg-brand-navy/5"
+            >
+              <span className="font-medium text-brand-navy">{r.name}</span>
+              <span className="text-brand-navy/60">{r.phone}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

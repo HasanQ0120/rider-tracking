@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { CallButton } from "@/components/ui/CallButton";
+import { Card } from "@/components/ui/Card";
+import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { getOrCreateDeviceKey } from "@/lib/deviceKey";
 import { haversineMeters } from "@/lib/geo";
@@ -273,13 +275,15 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }
   if (screen === "permission_denied") {
     return (
-      <div className="mx-auto max-w-md p-6 text-center">
-        <StatusBanner tone="danger">
-          Location access has been turned off. Please enable it in your browser settings to
-          continue sharing your location.
-        </StatusBanner>
-        <div className="mt-4">
-          <Button onClick={startTracking}>Try Again</Button>
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center p-6 text-center">
+        <div className="w-full animate-slide-up space-y-4">
+          <StatusBanner tone="danger">
+            Location access has been turned off. Please enable it in your browser settings to
+            continue sharing your location.
+          </StatusBanner>
+          <Button className="w-full" onClick={startTracking}>
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -287,43 +291,52 @@ export function RiderTrackingClient({ token }: { token: string }) {
 
   if (screen === "pin") {
     return (
-      <div className="mx-auto max-w-md p-6">
-        <ConsentLine />
-        <h1 className="mt-4 text-lg font-semibold text-brand-navy">Enter your PIN</h1>
-        <p className="mt-1 text-sm text-brand-navy/70">
-          We sent a 6-digit PIN to your phone in a separate message.
-        </p>
-        <input
-          inputMode="numeric"
-          maxLength={6}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          className="mt-4 w-full rounded-lg border border-brand-navy/30 px-4 py-3 text-center text-2xl tracking-widest"
-          placeholder="••••••"
-        />
-        {pinError && (
-          <p className="mt-2 text-sm text-status-danger" role="alert">
-            {pinError}
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
+        <Card className="animate-slide-up">
+          <ConsentLine />
+          <h1 className="mt-5 text-lg font-semibold text-brand-navy">Enter your PIN</h1>
+          <p className="mt-1 text-sm text-brand-navy/70">
+            We sent a 6-digit PIN to your phone in a separate message.
           </p>
-        )}
-        <Button
-          className="mt-4 w-full"
-          disabled={pin.length !== 6 || pinSubmitting}
-          onClick={submitPin}
-        >
-          {pinSubmitting ? "Confirming…" : "Confirm PIN"}
-        </Button>
+          <input
+            key={pinError ?? "ok"}
+            inputMode="numeric"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+            className={`mt-4 w-full rounded-lg border px-4 py-3 text-center text-2xl tracking-widest text-brand-navy ${
+              pinError ? "animate-shake border-status-danger" : "border-brand-navy/30"
+            }`}
+            placeholder="••••••"
+            autoFocus
+          />
+          {pinError && (
+            <p className="mt-2 animate-fade-in text-sm text-status-danger" role="alert">
+              {pinError}
+            </p>
+          )}
+          <Button
+            className="mt-4 w-full"
+            disabled={pin.length !== 6 || pinSubmitting}
+            onClick={submitPin}
+          >
+            {pinSubmitting && <Spinner className="h-4 w-4" />}
+            {pinSubmitting ? "Confirming…" : "Confirm PIN"}
+          </Button>
+        </Card>
       </div>
     );
   }
 
   if (screen === "ready") {
     return (
-      <div className="mx-auto max-w-md p-6 text-center">
-        <ConsentLine />
-        <Button className="mt-6" onClick={startTracking}>
-          Start Sharing My Location
-        </Button>
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6 text-center">
+        <Card className="animate-scale-in">
+          <ConsentLine />
+          <Button className="mt-6 w-full" onClick={startTracking}>
+            Start Sharing My Location
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -362,11 +375,11 @@ export function RiderTrackingClient({ token }: { token: string }) {
 
   return (
     <div className="flex h-screen flex-col">
-      <div className="border-b border-brand-navy/10 bg-white p-3">
-        {waitingForAccuracy && (
+      {waitingForAccuracy && (
+        <div className="border-b border-brand-navy/10 bg-white p-3">
           <StatusBanner tone="warning">Waiting for an accurate GPS signal…</StatusBanner>
-        )}
-      </div>
+        </div>
+      )}
       <div className="flex-1">
         <TrackingMap
           markers={markers}
@@ -379,22 +392,28 @@ export function RiderTrackingClient({ token }: { token: string }) {
           }
         />
       </div>
-      <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4">
+      <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
         {order?.customer_phone && (
-          <CallButton phone={order.customer_phone} label="Call Customer" />
+          <div className="animate-fade-in">
+            <CallButton phone={order.customer_phone} label="Call Customer" />
+          </div>
         )}
         {!arrivedTapped && withinDeliveryRadius && (
-          <Button onClick={tapArrived} disabled={arrivedBusy}>
-            I&apos;ve Arrived
-          </Button>
+          <div className="animate-fade-in">
+            <Button className="w-full" onClick={tapArrived} disabled={arrivedBusy}>
+              {arrivedBusy && <Spinner className="h-4 w-4" />}
+              I&apos;ve Arrived
+            </Button>
+          </div>
         )}
-        <Button onClick={tapDelivered} disabled={deliveredBusy}>
+        <Button className="w-full" onClick={tapDelivered} disabled={deliveredBusy}>
+          {deliveredBusy && <Spinner className="h-4 w-4" />}
           Mark as Delivered
         </Button>
         <button
           onClick={requestResend}
           disabled={resendState === "sending" || resendState === "limited"}
-          className="text-sm text-brand-navy/60 underline disabled:opacity-50"
+          className="text-sm text-brand-navy/60 underline transition-colors hover:text-brand-navy disabled:opacity-50"
         >
           {resendState === "sent"
             ? "Link resent"
@@ -417,8 +436,10 @@ function ConsentLine() {
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen items-center justify-center p-6 text-center text-brand-navy">
-      {children}
+    <div className="flex h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="animate-scale-in max-w-sm rounded-xl border border-brand-navy/10 bg-white p-6 text-center text-brand-navy shadow-sm">
+        {children}
+      </div>
     </div>
   );
 }

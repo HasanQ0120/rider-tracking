@@ -16,41 +16,66 @@ function riderName(riders: OrderRow["riders"]): string {
   return Array.isArray(riders) ? riders[0]?.name ?? "Unassigned" : riders.name;
 }
 
+const statusPillClasses: Record<string, string> = {
+  pending: "bg-brand-navy/10 text-brand-navy",
+  assigned: "bg-status-warning/10 text-status-warning",
+  in_transit: "bg-status-warning/10 text-status-warning",
+  arrived: "bg-status-warning/10 text-status-warning",
+  delivered: "bg-status-success/10 text-status-success",
+  cancelled: "bg-status-danger/10 text-status-danger",
+};
+
 export function OrdersTable({ orders }: { orders: OrderRow[] }) {
+  if (orders.length === 0) {
+    return (
+      <div className="animate-fade-in rounded-xl border border-dashed border-brand-navy/20 p-12 text-center text-brand-navy/50">
+        No orders yet.
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-brand-navy/10">
+    <div className="animate-fade-in overflow-x-auto rounded-xl border border-brand-navy/10 shadow-sm">
       <table className="w-full text-left text-sm">
-        <thead className="bg-brand-navy/5 text-brand-navy">
+        <thead className="bg-brand-navy/5 text-xs font-semibold uppercase tracking-wide text-brand-navy/60">
           <tr>
-            <th className="px-4 py-2">Customer</th>
-            <th className="px-4 py-2">Address</th>
-            <th className="px-4 py-2">Rider</th>
-            <th className="px-4 py-2">Status</th>
-            <th className="px-4 py-2">Flags</th>
+            <th className="px-4 py-3">Customer</th>
+            <th className="px-4 py-3">Address</th>
+            <th className="px-4 py-3">Rider</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Flags</th>
           </tr>
         </thead>
         <tbody>
           {orders.map((o) => (
-            <tr key={o.id} className="border-t border-brand-navy/10">
-              <td className="px-4 py-2">
-                <Link href={`/ops/orders/${o.id}`} className="text-brand-navy underline">
+            <tr key={o.id} className="border-t border-brand-navy/10 transition-colors hover:bg-brand-navy/5">
+              <td className="px-4 py-3">
+                <Link href={`/ops/orders/${o.id}`} className="font-medium text-brand-navy hover:underline">
                   {o.customer_name}
                 </Link>
               </td>
-              <td className="px-4 py-2">{o.delivery_address}</td>
-              <td className="px-4 py-2">{riderName(o.riders)}</td>
-              <td className="px-4 py-2 capitalize">{o.status.replace("_", " ")}</td>
-              <td className="px-4 py-2">
-                {o.tracking_expired_unresolved && (
-                  <span className="rounded bg-status-warning/10 px-2 py-0.5 text-status-warning">
-                    link expired
-                  </span>
-                )}
-                {o.delivery_confirmed_by === "auto_location" && (
-                  <span className="ml-1 rounded bg-status-success/10 px-2 py-0.5 text-status-success">
-                    auto-confirmed
-                  </span>
-                )}
+              <td className="px-4 py-3 text-brand-navy/70">{o.delivery_address}</td>
+              <td className="px-4 py-3 text-brand-navy/70">{riderName(o.riders)}</td>
+              <td className="px-4 py-3">
+                <span
+                  className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium capitalize ${statusPillClasses[o.status] ?? "bg-brand-navy/10 text-brand-navy"}`}
+                >
+                  {o.status.replace("_", " ")}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex gap-1">
+                  {o.tracking_expired_unresolved && (
+                    <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs text-status-warning">
+                      link expired
+                    </span>
+                  )}
+                  {o.delivery_confirmed_by === "auto_location" && (
+                    <span className="rounded-full bg-status-success/10 px-2 py-0.5 text-xs text-status-success">
+                      auto-confirmed
+                    </span>
+                  )}
+                </div>
               </td>
             </tr>
           ))}

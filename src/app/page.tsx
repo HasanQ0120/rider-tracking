@@ -10,7 +10,7 @@ export default function Home() {
       </p>
       <Link
         href="/ops"
-        className="rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white hover:bg-brand-navy/90"
+        className="rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white shadow-sm transition-all duration-150 hover:bg-brand-navy/90 hover:shadow active:scale-[0.98]"
       >
         Go to Ops Panel
       </Link>

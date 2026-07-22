@@ -15,9 +15,9 @@ export default async function OpsOrdersPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-brand-navy">Orders</h1>
+    <div className="animate-slide-up">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-brand-navy">Orders</h1>
         <Link href="/ops/orders/new">
           <Button>New Order</Button>
         </Link>

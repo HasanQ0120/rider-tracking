@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap } from "@/components/map/TrackingMap";
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
@@ -91,74 +95,75 @@ export function NewOrderForm() {
     <div className="space-y-6">
       {error && <StatusBanner tone="danger">{error}</StatusBanner>}
 
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-brand-navy/70">Customer</h2>
-        <input
-          placeholder="Customer name"
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          className="w-full rounded-lg border border-brand-navy/30 px-4 py-2"
-        />
-        <input
-          placeholder="Customer phone"
-          value={customerPhone}
-          onChange={(e) => setCustomerPhone(e.target.value)}
-          className="w-full rounded-lg border border-brand-navy/30 px-4 py-2"
-        />
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-brand-navy/70">Delivery Address</h2>
-        <div className="flex gap-2">
-          <input
-            placeholder="Search for an address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-            className="flex-1 rounded-lg border border-brand-navy/30 px-4 py-2"
+      <Card title="Customer">
+        <div className="space-y-3">
+          <Input
+            placeholder="Customer name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
           />
-          <Button variant="accent-outline" onClick={searchAddress} disabled={searching || !address.trim()}>
-            {searching ? "Searching…" : "Search"}
-          </Button>
+          <Input
+            placeholder="Customer phone"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+          />
         </div>
+      </Card>
 
-        {searched && !searching && candidates.length === 0 && (
-          <StatusBanner tone="warning">
-            No matching address found. Try a more specific search (e.g. include city/area).
-          </StatusBanner>
-        )}
+      <Card title="Delivery Address">
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search for an address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchAddress()}
+              className="flex-1"
+            />
+            <Button variant="accent-outline" onClick={searchAddress} disabled={searching || !address.trim()}>
+              {searching && <Spinner className="h-4 w-4" />}
+              {searching ? "Searching…" : "Search"}
+            </Button>
+          </div>
 
-        {candidates.length > 0 && (
-          <>
-            <label className="block text-xs text-brand-navy/60">
-              {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the right one:
-            </label>
-            <select
-              className="w-full rounded-lg border border-brand-navy/30 px-4 py-2"
-              value={selected ? candidateKey(selected) : ""}
-              onChange={(e) =>
-                setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
-              }
-            >
-              {candidates.map((c) => (
-                <option key={candidateKey(c)} value={candidateKey(c)}>
-                  {c.placeName}
-                </option>
-              ))}
-            </select>
-            {selected && (
-              <div className="h-64 overflow-hidden rounded-lg border border-brand-navy/10">
-                <TrackingMap
-                  markers={[{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#0A192F" }]}
-                  defaultCenter={[selected.lat, selected.lng]}
-                />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          {searched && !searching && candidates.length === 0 && (
+            <StatusBanner tone="warning">
+              No matching address found. Try a more specific search (e.g. include city/area).
+            </StatusBanner>
+          )}
+
+          {candidates.length > 0 && (
+            <div className="animate-fade-in space-y-3">
+              <label className="block text-xs text-brand-navy/60">
+                {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the right one:
+              </label>
+              <Select
+                value={selected ? candidateKey(selected) : ""}
+                onChange={(e) =>
+                  setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
+                }
+              >
+                {candidates.map((c) => (
+                  <option key={candidateKey(c)} value={candidateKey(c)}>
+                    {c.placeName}
+                  </option>
+                ))}
+              </Select>
+              {selected && (
+                <div className="h-64 animate-fade-in overflow-hidden rounded-lg border border-brand-navy/10 shadow-sm">
+                  <TrackingMap
+                    markers={[{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#0A192F" }]}
+                    defaultCenter={[selected.lat, selected.lng]}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
 
       <Button className="w-full" onClick={submit} disabled={submitting || !selected}>
+        {submitting && <Spinner className="h-4 w-4" />}
         {submitting ? "Creating…" : "Create Order"}
       </Button>
     </div>
