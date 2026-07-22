@@ -15,12 +15,19 @@ export default async function OrderDetailPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, customer_name, customer_phone, delivery_address, address_detail, status, assigned_rider_id, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, rider_arrived_at, created_at, delivered_at"
+      "id, customer_name, customer_phone, delivery_address, address_detail, delivery_lat, delivery_lng, status, assigned_rider_id, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, rider_arrived_at, pending_confirmation_at, created_at, delivered_at"
     )
     .eq("id", id)
     .single();
 
   if (!order) notFound();
+
+  // Display-only rank for the "ORD-000N" code -- no such column exists, so
+  // it's derived from how many orders were created at or before this one.
+  const { count: orderRank } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .lte("created_at", order.created_at);
 
   const { data: tokens } = await supabase
     .from("tracking_tokens")
@@ -34,5 +41,12 @@ export default async function OrderDetailPage({
     .eq("active", true)
     .order("name");
 
-  return <OrderDetail order={order} tokens={tokens ?? []} riders={riders ?? []} />;
+  return (
+    <OrderDetail
+      order={order}
+      orderRank={orderRank ?? 1}
+      tokens={tokens ?? []}
+      riders={riders ?? []}
+    />
+  );
 }

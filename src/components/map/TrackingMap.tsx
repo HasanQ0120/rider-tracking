@@ -47,16 +47,26 @@ function shortestAngleDelta(from: number, to: number): number {
 function buildIconHtml(marker: MapMarker): string {
   if (marker.shape === "arrow") {
     const deg = marker.heading ?? 0;
-    // Kite/chevron shape pointing "up" (north) at 0deg -- CSS rotate() is
-    // clockwise-positive, matching the compass-bearing convention used
-    // throughout this app, so no sign-flipping is needed here.
-    return `<div class="${ROTATABLE_CLASS}" style="width:100%;height:100%;transform:rotate(${deg}deg);transform-origin:50% 50%;">
-      <svg viewBox="0 0 24 24" width="28" height="28">
-        <path d="M12 2 L19 21 L12 17 L5 21 Z" fill="${marker.color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-      </svg>
+    // Gold-ringed white badge (dark theme's rider marker) with the same
+    // black chevron rotated inside it -- the ring/background is static;
+    // only the inner div rotates, so animateMarkerTo's rotation logic below
+    // is unaffected by this restyle.
+    return `<div style="width:100%;height:100%;border-radius:50%;background:white;border:3px solid #FFD700;box-shadow:0 2px 6px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
+      <div class="${ROTATABLE_CLASS}" style="width:65%;height:65%;transform:rotate(${deg}deg);transform-origin:50% 50%;">
+        <svg viewBox="0 0 24 24" width="100%" height="100%">
+          <path d="M12 2 L19 21 L12 17 L5 21 Z" fill="${marker.color}" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>`;
   }
-  return `<div style="width:18px;height:18px;border-radius:50%;background:${marker.color};border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`;
+  // Teardrop map-pin shape (destination / address markers) instead of a
+  // plain dot -- anchored at the bottom tip in the sizing logic below,
+  // since that point is the actual geographic location, not the pin's
+  // visual center.
+  return `<svg viewBox="0 0 26 34" width="26" height="34">
+    <path d="M13 0C6 0 1 5.5 1 12c0 8 12 22 12 22s12-14 12-22C25 5.5 20 0 13 0z" fill="${marker.color}" stroke="white" stroke-width="1.5"/>
+    <circle cx="13" cy="12" r="4.5" fill="white"/>
+  </svg>`;
 }
 
 function animateMarkerTo(
@@ -190,6 +200,17 @@ export function TrackingMap({
         maxZoom: 19,
       }).addTo(map);
 
+      // Dark-theme map: still the same free public OSM tile server (same
+      // accepted-risk decision as before, see the comment above) -- a CSS
+      // filter on just the tile pane renders it dark to match the rest of
+      // the app, without switching tile providers. Scoped to this one pane
+      // so markers/controls/route line (painted in separate panes) are
+      // never affected by it.
+      const tilePane = map.getPane("tilePane");
+      if (tilePane) {
+        tilePane.style.filter = "invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.7)";
+      }
+
       map.on("click", (e: Leaflet.LeafletMouseEvent) => {
         onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
       });
@@ -268,12 +289,16 @@ export function TrackingMap({
         );
       } else {
         const isArrow = marker.shape === "arrow";
-        const size = isArrow ? 28 : 18;
+        // Arrow badge is a circle, anchored at its center. The destination
+        // pin is a teardrop, anchored at its bottom tip -- that point, not
+        // the shape's visual center, is the actual geographic location.
+        const iconSize: [number, number] = isArrow ? [32, 32] : [26, 34];
+        const iconAnchor: [number, number] = isArrow ? [16, 16] : [13, 34];
         const icon = L.divIcon({
           className: "",
           html: buildIconHtml(marker),
-          iconSize: [size, size],
-          iconAnchor: [size / 2, size / 2],
+          iconSize,
+          iconAnchor,
         });
         const m = L.marker([marker.lat, marker.lng], { icon, draggable: marker.draggable ?? false }).addTo(
           map
@@ -360,9 +385,10 @@ export function TrackingMap({
           routeLineRef.current.setLatLngs(latLngs);
         } else {
           routeLineRef.current = L.polyline(latLngs, {
-            color: "#0A192F",
+            color: "#FFD700",
             weight: 4,
-            opacity: 0.65,
+            opacity: 0.85,
+            dashArray: "8, 8",
           }).addTo(map);
         }
         if (typeof data.durationSeconds === "number") {

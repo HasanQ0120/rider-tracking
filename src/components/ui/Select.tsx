@@ -5,7 +5,7 @@ import { SelectHTMLAttributes } from "react";
 export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-lg border border-brand-navy/30 bg-white px-4 py-2.5 text-brand-navy ${className}`}
+      className={`w-full rounded-lg border border-white/20 bg-surface px-4 py-2.5 text-white ${className}`}
       {...props}
     />
   );

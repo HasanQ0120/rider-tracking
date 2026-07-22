@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Card } from "@/components/ui/Card";
@@ -26,6 +27,10 @@ const DEFAULT_MAP_CENTER: [number, number] = [24.9204, 67.0946];
 // isn't a safe React key or <select> value, so combine it with coordinates.
 function candidateKey(c: GeocodeResult): string {
   return `${c.placeName}__${c.lat}__${c.lng}`;
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{children}</label>;
 }
 
 export function NewOrderForm() {
@@ -152,123 +157,140 @@ export function NewOrderForm() {
         </div>
       )}
 
-      <Card title="Customer">
-        <div className="space-y-3">
-          <Input
-            placeholder="Customer name"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-          />
-          <div>
-            <Input
-              ref={phoneInputRef}
-              placeholder="Customer phone (e.g. 03XXXXXXXXX)"
-              value={customerPhone}
-              onChange={(e) => {
-                setCustomerPhone(e.target.value);
-                if (phoneError) setPhoneError(null);
-              }}
-              onBlur={() => {
-                if (customerPhone.trim() && !isValidPakistaniMobile(customerPhone)) {
-                  setPhoneError(PK_MOBILE_HINT);
-                }
-              }}
-              className={phoneError ? "border-status-danger" : ""}
-            />
-            {phoneError && (
-              <p className="mt-1 text-sm text-status-danger" role="alert">
-                {phoneError}
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      <Card title="Delivery Address">
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search for an address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-              className="flex-1"
-            />
-            <Button variant="accent-outline" onClick={searchAddress} disabled={searching || !address.trim()}>
-              {searching && <Spinner className="h-4 w-4" />}
-              {searching ? "Searching…" : "Search"}
-            </Button>
-          </div>
-
-          {searched && !searching && candidates.length === 0 && (
-            <StatusBanner tone="warning">
-              No matching address found. You can place the pin manually on the map below instead.
-            </StatusBanner>
-          )}
-
-          {candidates.length > 0 && (
-            <div className="animate-fade-in space-y-3">
-              <label className="block text-xs text-brand-navy/60">
-                {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the right one:
-              </label>
-              <Select
-                value={selected ? candidateKey(selected) : ""}
-                onChange={(e) =>
-                  setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
-                }
-              >
-                {candidates.map((c) => (
-                  <option key={candidateKey(c)} value={candidateKey(c)}>
-                    {c.placeName}
-                  </option>
-                ))}
-              </Select>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <Card title="Customer Information">
+            <div className="space-y-4">
+              <div>
+                <Label>Full Name</Label>
+                <Input
+                  placeholder="e.g. Fatima Zahra"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Pakistani Phone</Label>
+                <Input
+                  ref={phoneInputRef}
+                  placeholder="0300-1234567"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    setCustomerPhone(e.target.value);
+                    if (phoneError) setPhoneError(null);
+                  }}
+                  onBlur={() => {
+                    if (customerPhone.trim() && !isValidPakistaniMobile(customerPhone)) {
+                      setPhoneError(PK_MOBILE_HINT);
+                    }
+                  }}
+                  className={phoneError ? "border-status-danger" : ""}
+                />
+                {phoneError && (
+                  <p className="mt-1 text-sm text-status-danger" role="alert">
+                    {phoneError}
+                  </p>
+                )}
+              </div>
             </div>
-          )}
+          </Card>
 
-          <div className="space-y-2">
-            <label className="block text-xs text-brand-navy/60">
-              {selected
-                ? "Drag the pin to fine-tune its exact position, or click elsewhere to move it."
-                : "Or click anywhere on the map to place the delivery pin manually."}
-            </label>
-            <div className="h-80 overflow-hidden rounded-lg border border-brand-navy/10 shadow-sm">
-              <TrackingMap
-                markers={
-                  selected
-                    ? [{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#0A192F", draggable: true }]
-                    : []
-                }
-                defaultCenter={selected ? [selected.lat, selected.lng] : DEFAULT_MAP_CENTER}
-                onMapClick={handleMapClick}
-                onMarkerDrag={handlePinDrag}
-              />
+          <Card title="Delivery Location">
+            <div className="space-y-4">
+              <div>
+                <Label>Search Address</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search Karachi address…"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchAddress()}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="accent-outline"
+                    onClick={searchAddress}
+                    disabled={searching || !address.trim()}
+                  >
+                    {searching && <Spinner className="h-4 w-4" />}
+                    {searching ? "Searching…" : "Search"}
+                  </Button>
+                </div>
+              </div>
+
+              {searched && !searching && candidates.length === 0 && (
+                <StatusBanner tone="warning">
+                  No matching address found. You can place the pin manually on the map instead.
+                </StatusBanner>
+              )}
+
+              {candidates.length > 0 && (
+                <div className="animate-fade-in space-y-2">
+                  <Label>
+                    {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the right one
+                  </Label>
+                  <Select
+                    value={selected ? candidateKey(selected) : ""}
+                    onChange={(e) =>
+                      setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
+                    }
+                  >
+                    {candidates.map((c) => (
+                      <option key={candidateKey(c)} value={candidateKey(c)}>
+                        {c.placeName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <Label>Delivery Address</Label>
+                <Input placeholder="Full delivery address" value={selected?.placeName ?? ""} readOnly />
+              </div>
+
+              <div>
+                <Label>Plot / House / Floor</Label>
+                <Input
+                  placeholder="e.g. House 12, Floor 2, near the mosque…"
+                  value={addressDetail}
+                  onChange={(e) => setAddressDetail(e.target.value)}
+                />
+              </div>
             </div>
-            {selected && (
-              <p className="text-xs text-brand-navy/50">
-                Pin: {selected.lat.toFixed(5)}, {selected.lng.toFixed(5)}
-              </p>
-            )}
-          </div>
+          </Card>
+        </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs text-brand-navy/60">
-              Address detail (plot/house #, floor, landmark, etc.) — the search above only finds
-              the general area, not this level of detail:
-            </label>
-            <Input
-              placeholder="e.g. House 12-B, Street 5, 2nd floor, opposite Al-Falah Mosque"
-              value={addressDetail}
-              onChange={(e) => setAddressDetail(e.target.value)}
+        <div className="space-y-2">
+          <div className="h-80 overflow-hidden rounded-xl border border-white/10 shadow-sm lg:h-full lg:min-h-[420px]">
+            <TrackingMap
+              markers={
+                selected
+                  ? [{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#FFD700", draggable: true }]
+                  : []
+              }
+              defaultCenter={selected ? [selected.lat, selected.lng] : DEFAULT_MAP_CENTER}
+              onMapClick={handleMapClick}
+              onMarkerDrag={handlePinDrag}
             />
           </div>
+          <p className="text-xs text-white/40">
+            {selected
+              ? `📍 ${selected.lat.toFixed(6)}, ${selected.lng.toFixed(6)}`
+              : "Click the map or drag the pin to refine the exact delivery location"}
+          </p>
         </div>
-      </Card>
+      </div>
 
-      <Button className="w-full" onClick={submit} disabled={submitting || !selected}>
-        {submitting && <Spinner className="h-4 w-4" />}
-        {submitting ? "Creating…" : "Create Order"}
-      </Button>
+      <div className="flex items-center justify-end gap-3">
+        <Link href="/ops/orders">
+          <Button variant="accent-outline">Cancel</Button>
+        </Link>
+        <Button onClick={submit} disabled={submitting || !selected}>
+          {submitting && <Spinner className="h-4 w-4" />}
+          {submitting ? "Creating…" : "Create Order"}
+        </Button>
+      </div>
     </div>
   );
 }

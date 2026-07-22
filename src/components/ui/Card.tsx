@@ -15,9 +15,9 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-xl border border-brand-navy/10 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${className}`}
+      className={`rounded-xl border border-white/10 bg-surface-raised p-5 shadow-sm transition-shadow hover:shadow-md hover:shadow-black/20 ${className}`}
     >
-      {title && <h2 className="mb-3 font-semibold text-brand-navy">{title}</h2>}
+      {title && <h2 className="mb-3 font-semibold text-white">{title}</h2>}
       {children}
     </div>
   );

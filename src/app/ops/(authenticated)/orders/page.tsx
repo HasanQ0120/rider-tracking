@@ -10,16 +10,16 @@ export default async function OpsOrdersPage() {
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id, customer_name, delivery_address, status, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, created_at, riders:assigned_rider_id(name)"
+      "id, customer_name, customer_phone, delivery_address, address_detail, status, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, created_at, riders:assigned_rider_id(name, license_plate)"
     )
     .order("created_at", { ascending: false });
 
   return (
     <div className="animate-slide-up">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-brand-navy">Orders</h1>
+        <h1 className="text-2xl font-semibold text-white">Orders</h1>
         <Link href="/ops/orders/new">
-          <Button>New Order</Button>
+          <Button>+ New Order</Button>
         </Link>
       </div>
       <OrdersTable orders={orders ?? []} />

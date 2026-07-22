@@ -343,8 +343,8 @@ export function RiderTrackingClient({ token }: { token: string }) {
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
         <Card className="animate-slide-up">
           <ConsentLine />
-          <h1 className="mt-5 text-lg font-semibold text-brand-navy">Enter your PIN</h1>
-          <p className="mt-1 text-sm text-brand-navy/70">
+          <h1 className="mt-5 text-lg font-semibold text-white">Enter your PIN</h1>
+          <p className="mt-1 text-sm text-white/60">
             We sent a 6-digit PIN to your phone in a separate message.
           </p>
           <input
@@ -353,8 +353,8 @@ export function RiderTrackingClient({ token }: { token: string }) {
             maxLength={6}
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            className={`mt-4 w-full rounded-lg border px-4 py-3 text-center text-2xl tracking-widest text-brand-navy ${
-              pinError ? "animate-shake border-status-danger" : "border-brand-navy/30"
+            className={`mt-4 w-full rounded-lg border bg-surface px-4 py-3 text-center text-2xl tracking-widest text-white ${
+              pinError ? "animate-shake border-status-danger" : "border-white/20"
             }`}
             placeholder="••••••"
             autoFocus
@@ -425,13 +425,13 @@ export function RiderTrackingClient({ token }: { token: string }) {
   return (
     <div className="flex h-screen flex-col">
       {order?.delivery_address && (
-        <div className="border-b border-brand-navy/10 bg-white px-4 py-2">
-          <p className="text-sm font-medium text-brand-navy">{order.delivery_address}</p>
+        <div className="border-b border-white/10 bg-surface-raised px-4 py-2">
+          <p className="text-sm font-medium text-white">{order.delivery_address}</p>
           {order.address_detail && (
-            <p className="text-sm text-brand-navy/70">{order.address_detail}</p>
+            <p className="text-sm text-white/60">{order.address_detail}</p>
           )}
           {(etaSeconds != null || ownSpeedKmh != null) && (
-            <p className="text-sm text-brand-navy/70">
+            <p className="text-sm text-white/60">
               {etaSeconds != null && formatEta(etaSeconds)}
               {etaSeconds != null && ownSpeedKmh != null && " · "}
               {ownSpeedKmh != null && formatRiderSpeed(ownSpeedKmh)}
@@ -440,7 +440,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
         </div>
       )}
       {waitingForAccuracy && (
-        <div className="border-b border-brand-navy/10 bg-white p-3">
+        <div className="border-b border-white/10 bg-surface-raised p-3">
           <StatusBanner tone="warning">Waiting for an accurate GPS signal…</StatusBanner>
         </div>
       )}
@@ -457,7 +457,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
           onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
         />
       </div>
-      <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
+      <div className="flex flex-col gap-2 border-t border-white/10 bg-surface-raised p-4 shadow-lg">
         {order?.customer_phone && (
           <div className="animate-fade-in">
             <CallButton phone={order.customer_phone} label="Call Customer" />
@@ -482,7 +482,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
         <button
           onClick={requestResend}
           disabled={resendState === "sending" || resendState === "limited"}
-          className="text-sm text-brand-navy/60 underline transition-colors hover:text-brand-navy disabled:opacity-50"
+          className="text-sm text-white/50 underline transition-colors hover:text-white disabled:opacity-50"
         >
           {resendState === "sent"
             ? "Link resent"
@@ -514,8 +514,8 @@ function ConsentLine() {
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen items-center justify-center bg-brand-navy/5 p-6">
-      <div className="animate-scale-in max-w-sm rounded-xl border border-brand-navy/10 bg-white p-6 text-center text-brand-navy shadow-sm">
+    <div className="flex h-screen items-center justify-center bg-surface p-6">
+      <div className="animate-scale-in max-w-sm rounded-xl border border-white/10 bg-surface-raised p-6 text-center text-white shadow-sm">
         {children}
       </div>
     </div>

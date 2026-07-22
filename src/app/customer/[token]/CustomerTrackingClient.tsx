@@ -28,6 +28,7 @@ type OrderInfo = {
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by?: string | null;
   review_flag_reason?: string | null;
+  assigned_rider_id?: string | null;
 };
 type Rider = { name: string; phone: string; license_plate: string | null } | null;
 type Loc = {
@@ -161,7 +162,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   }
   if (order.status === "delivered") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
         <Card className="w-full max-w-sm animate-scale-in text-center">
           <StatusBanner tone="success">Your order has been delivered!</StatusBanner>
         </Card>
@@ -170,7 +171,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   }
   if (order.status === "flagged_review") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
         <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
           <StatusBanner tone="warning">
             We&apos;re looking into this and will follow up shortly.
@@ -182,9 +183,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   }
   if (order.status === "pending_confirmation") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
         <Card className="w-full max-w-sm animate-scale-in space-y-4 text-center">
-          <p className="text-brand-navy">
+          <p className="text-white">
             Your rider has marked this as delivered — did you receive your order?
           </p>
           <div className="flex gap-3">
@@ -216,7 +217,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   // the order was ever marked delivered.
   if (order.tracking_expired_unresolved) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-navy/5 p-6">
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
         <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
           <StatusBanner tone="warning">
             Tracking link expired. We&apos;re re-establishing the connection with your rider — this
@@ -248,31 +249,16 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       ? [loc.lat, loc.lng]
       : [0, 0];
 
+  const distanceKm =
+    loc && order.delivery_lat != null && order.delivery_lng != null
+      ? haversineMeters(loc.lat, loc.lng, order.delivery_lat, order.delivery_lng) / 1000
+      : null;
+  const etaMinutes = etaSeconds != null ? Math.max(1, Math.round(etaSeconds / 60)) : null;
+  const isRiderAssigned = Boolean(order.assigned_rider_id);
+
   return (
-    <div className="flex h-screen flex-col">
-      {order.delivery_address && (
-        <div className="border-b border-brand-navy/10 bg-white px-4 py-2">
-          <p className="text-sm font-medium text-brand-navy">{order.delivery_address}</p>
-          {order.address_detail && (
-            <p className="text-sm text-brand-navy/70">{order.address_detail}</p>
-          )}
-          {(etaSeconds != null || loc?.speed_kmh != null) && (
-            <p className="text-sm text-brand-navy/70">
-              {etaSeconds != null && formatEta(etaSeconds)}
-              {etaSeconds != null && loc?.speed_kmh != null && " · "}
-              {loc?.speed_kmh != null && formatRiderSpeed(loc.speed_kmh)}
-            </p>
-          )}
-        </div>
-      )}
-      {connectionLost && (
-        <div className="border-b border-brand-navy/10 bg-white p-3">
-          <StatusBanner tone="danger">
-            Connection lost — showing rider&apos;s last known position.
-          </StatusBanner>
-        </div>
-      )}
-      <div className="flex-1">
+    <div className="relative h-screen overflow-hidden bg-surface">
+      <div className="absolute inset-0">
         <TrackingMap
           markers={markers}
           defaultCenter={defaultCenter}
@@ -285,42 +271,87 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
         />
       </div>
-      <div className="border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">
-        {rider && (
-          // Mobile: sits in the normal flow, above the call/complete row, at
-          // the bottom of the screen -- the inDrive-style "driver card"
-          // spot. Desktop (md+): pulled out of that flow and floated over
-          // the map instead, near the top-left; a placeholder position,
-          // fine to move once this is visible on an actual desktop screen.
-          // z-[2000] matches ConfirmDialog's -- Leaflet's own panes/controls
-          // carry z-index up to 1000 and escape into the root stacking
-          // context, so anything meant to sit above the map needs to clear
-          // that, not just Tailwind's default scale.
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-brand-navy/10 bg-brand-navy/5 p-3 animate-slide-up md:fixed md:left-4 md:top-20 md:z-[2000] md:mb-0 md:w-64 md:border-brand-navy/10 md:bg-white md:shadow-lg">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-brand-navy/50">Your courier</p>
-              <p className="text-base font-semibold text-brand-navy">{rider.name}</p>
+
+      {/* z-[2000] matches ConfirmDialog's -- Leaflet's own panes/controls
+          carry z-index up to 1000 and escape into the root stacking
+          context, so anything meant to float above the map needs to clear
+          that, not just Tailwind's default scale. */}
+      <div className="absolute inset-x-0 top-0 z-[2000] animate-slide-up border-b border-white/10 bg-surface-raised/95 px-4 py-3 shadow-lg backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          {etaMinutes != null && (
+            <div className="shrink-0 text-center">
+              <p className="text-lg font-bold text-brand-gold">{etaMinutes} min</p>
+              {distanceKm != null && (
+                <p className="text-xs text-white/50">{distanceKm.toFixed(1)} km away</p>
+              )}
             </div>
-            {rider.license_plate && (
-              <p className="rounded-md bg-brand-navy px-2 py-1 text-xs font-semibold tracking-wide text-white">
-                {rider.license_plate}
+          )}
+          <div className={`min-w-0 flex-1 ${etaMinutes != null ? "border-l border-white/10 pl-4" : ""}`}>
+            <p className="flex items-center gap-1.5 text-sm font-medium text-brand-gold">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
+              {isRiderAssigned ? "Your rider is on the way" : "Preparing your order"}
+            </p>
+            {order.delivery_address && (
+              <p className="truncate text-xs text-white/50">
+                {order.delivery_address}
+                {order.address_detail ? `, ${order.address_detail}` : ""}
               </p>
             )}
+            {loc?.speed_kmh != null && (
+              <p className="text-xs text-white/40">{formatRiderSpeed(loc.speed_kmh)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {connectionLost && (
+        <div className="absolute inset-x-0 top-16 z-[2000] px-4">
+          <StatusBanner tone="danger">
+            Connection lost — showing rider&apos;s last known position.
+          </StatusBanner>
+        </div>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 z-[2000] animate-slide-up border-t border-white/10 bg-surface-raised/95 p-4 shadow-lg backdrop-blur-sm">
+        {rider ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-white/50">Your courier</p>
+                <p className="text-base font-semibold text-white">{rider.name}</p>
+              </div>
+              {rider.license_plate && (
+                <p className="rounded-md bg-brand-gold px-2 py-1 text-xs font-semibold tracking-wide text-brand-navy">
+                  {rider.license_plate}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="animate-fade-in">
+                <CallButton phone={rider.phone} label="Call Rider" />
+              </div>
+              {canComplete && (
+                <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
+                  {completing && <Spinner className="h-4 w-4" />}
+                  Complete
+                </Button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/40">
+              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">Rider not yet assigned</p>
+              <p className="text-xs text-white/50">Your order is being prepared</p>
+            </div>
           </div>
         )}
-        <div className="flex items-center gap-3">
-          {rider && (
-            <div className="animate-fade-in">
-              <CallButton phone={rider.phone} label="Call Rider" />
-            </div>
-          )}
-          {canComplete && (
-            <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
-              {completing && <Spinner className="h-4 w-4" />}
-              Complete
-            </Button>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -328,8 +359,8 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen items-center justify-center bg-brand-navy/5 p-6">
-      <div className="animate-scale-in max-w-sm rounded-xl border border-brand-navy/10 bg-white p-6 text-center text-brand-navy shadow-sm">
+    <div className="flex h-screen items-center justify-center bg-surface p-6">
+      <div className="animate-scale-in max-w-sm rounded-xl border border-white/10 bg-surface-raised p-6 text-center text-white shadow-sm">
         {children}
       </div>
     </div>

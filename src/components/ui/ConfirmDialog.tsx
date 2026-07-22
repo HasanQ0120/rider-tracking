@@ -38,11 +38,11 @@ export function ConfirmDialog({
       aria-modal="true"
     >
       <div
-        className="w-full max-w-sm animate-scale-in rounded-xl bg-white p-6 shadow-lg"
+        className="w-full max-w-sm animate-scale-in rounded-xl border border-white/10 bg-surface-raised p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        {title && <h2 className="mb-2 text-lg font-semibold text-brand-navy">{title}</h2>}
-        <p className="mb-5 text-sm text-brand-navy/80">{message}</p>
+        {title && <h2 className="mb-2 text-lg font-semibold text-white">{title}</h2>}
+        <p className="mb-5 text-sm text-white/70">{message}</p>
         <div className="flex gap-3">
           <Button variant="accent-outline" className="flex-1" onClick={onCancel} disabled={confirming}>
             {cancelLabel}

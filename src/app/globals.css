@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a192f;
+  --background: #0a0f1c;
+  --foreground: #ffffff;
 }
 
 @theme inline {
@@ -15,6 +15,13 @@
   --color-brand-navy: #0a192f;
   --color-brand-gold: #ffd700;
   --color-brand-white: #ffffff;
+
+  /* Dark-theme surfaces -- page background is near-black navy, cards sit on
+     a slightly lighter navy "raised" surface, borders are low-contrast
+     white overlays instead of the old light-theme's low-contrast navy. */
+  --color-surface: #0a0f1c;
+  --color-surface-raised: #111a2e;
+  --color-border-subtle: rgba(255, 255, 255, 0.1);
 
   /* Status colors are intentionally NOT under `brand` and never restyled --
      they're read instinctively, so overriding them with brand colors would
@@ -112,8 +119,8 @@ select:focus-visible,
 textarea:focus-visible,
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(10, 25, 47, 0.25);
-  border-color: var(--color-brand-navy);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.35);
+  border-color: var(--color-brand-gold);
 }
 
 @media (prefers-reduced-motion: reduce) {
