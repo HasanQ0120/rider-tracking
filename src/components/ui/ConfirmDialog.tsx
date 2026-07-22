@@ -26,7 +26,13 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-brand-navy/50 p-4"
+      // z-50 used to lose to Leaflet's own panes (tile/marker/control panes
+      // carry explicit z-index up to 1000) whenever this dialog is shown
+      // over a TrackingMap -- neither .leaflet-container nor its ancestors
+      // here establish their own stacking context, so those panes escape to
+      // the page's root stacking context and paint over anything below
+      // z-1000. This has to clear that, not just Tailwind's default scale.
+      className="fixed inset-0 z-[2000] flex animate-fade-in items-center justify-center bg-brand-navy/50 p-4"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
