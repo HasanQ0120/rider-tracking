@@ -31,6 +31,7 @@ export function NewOrderForm() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
   const [candidates, setCandidates] = useState<GeocodeResult[]>([]);
   const [selected, setSelected] = useState<GeocodeResult | null>(null);
   const [searching, setSearching] = useState(false);
@@ -103,6 +104,7 @@ export function NewOrderForm() {
           delivery_address: selected.placeName,
           delivery_lat: selected.lat,
           delivery_lng: selected.lng,
+          address_detail: addressDetail,
         }),
       });
       const data = await res.json();
@@ -202,6 +204,18 @@ export function NewOrderForm() {
                 Pin: {selected.lat.toFixed(5)}, {selected.lng.toFixed(5)}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs text-brand-navy/60">
+              Address detail (plot/house #, floor, landmark, etc.) — the search above only finds
+              the general area, not this level of detail:
+            </label>
+            <Input
+              placeholder="e.g. House 12-B, Street 5, 2nd floor, opposite Al-Falah Mosque"
+              value={addressDetail}
+              onChange={(e) => setAddressDetail(e.target.value)}
+            />
           </div>
         </div>
       </Card>

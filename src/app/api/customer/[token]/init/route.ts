@@ -26,7 +26,7 @@ export async function POST(
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, status, delivery_address, delivery_lat, delivery_lng, rider_arrived_at, tracking_expired_unresolved, assigned_rider_id"
+      "id, status, delivery_address, address_detail, delivery_lat, delivery_lng, rider_arrived_at, tracking_expired_unresolved, assigned_rider_id"
     )
     .eq("id", tokenRow.order_id)
     .single();

@@ -13,6 +13,7 @@ type Order = {
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
+  address_detail: string | null;
   status: string;
   assigned_rider_id: string | null;
   tracking_expired_unresolved: boolean;
@@ -132,6 +133,9 @@ export function OrderDetail({
           </span>
         </div>
         <p className="mt-1 text-sm text-brand-navy/70">{order.delivery_address}</p>
+        {order.address_detail && (
+          <p className="mt-0.5 text-sm text-brand-navy/60">{order.address_detail}</p>
+        )}
         <div className="mt-3 space-y-2">
           {order.tracking_expired_unresolved && (
             <StatusBanner tone="warning">Tracking link expired on this still-open order.</StatusBanner>

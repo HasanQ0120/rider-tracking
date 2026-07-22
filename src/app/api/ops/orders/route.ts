@@ -22,8 +22,14 @@ export async function POST(req: Request) {
   const guard = await requireOpsUserApi();
   if ("error" in guard) return guard.error;
 
-  const { customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng } =
-    await req.json();
+  const {
+    customer_name,
+    customer_phone,
+    delivery_address,
+    delivery_lat,
+    delivery_lng,
+    address_detail,
+  } = await req.json();
 
   if (!customer_name || !customer_phone || !delivery_address) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
@@ -38,6 +44,7 @@ export async function POST(req: Request) {
       delivery_address,
       delivery_lat: delivery_lat ?? null,
       delivery_lng: delivery_lng ?? null,
+      address_detail: address_detail?.trim() || null,
     })
     .select()
     .single();
