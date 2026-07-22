@@ -96,6 +96,7 @@ export function TrackingMap({
   routeTo,
   onMapClick,
   onMarkerDrag,
+  onRouteInfo,
 }: {
   markers: MapMarker[];
   // Leaflet-native order: [lat, lng] (not Mapbox's [lng, lat]).
@@ -109,6 +110,13 @@ export function TrackingMap({
   // their maps does nothing extra.
   onMapClick?: (lat: number, lng: number) => void;
   onMarkerDrag?: (id: string, lat: number, lng: number) => void;
+  // Fires whenever the route line is (re)fetched, with the same
+  // OSRM-provided travel-time estimate used to draw the line -- no
+  // separate request. Called with null when the route line is hidden
+  // (routeFrom/routeTo missing). Not called on ticks where the existing
+  // line is kept as-is (not enough movement/time since the last fetch),
+  // so the ETA refreshes on exactly the same cadence as the line itself.
+  onRouteInfo?: (info: { durationSeconds: number } | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -272,6 +280,7 @@ export function TrackingMap({
       routeLineRef.current?.remove();
       routeLineRef.current = null;
       lastRouteFetchRef.current = { at: 0, from: null };
+      onRouteInfo?.(null);
       return;
     }
 
@@ -307,12 +316,16 @@ export function TrackingMap({
             opacity: 0.65,
           }).addTo(map);
         }
+        if (typeof data.durationSeconds === "number") {
+          onRouteInfo?.({ durationSeconds: data.durationSeconds });
+        }
       })
       .catch(() => {
         // Route line is a nice-to-have overlay -- a failed/rate-limited
         // fetch just means no line this tick, never something to surface
         // as an error to the rider/customer.
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeFrom, routeTo]);
 
   return <div ref={containerRef} className="h-full w-full" />;

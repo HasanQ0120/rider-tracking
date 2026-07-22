@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { haversineMeters } from "@/lib/geo";
+import { formatEta, formatRiderSpeed } from "@/lib/format";
 import {
   CONNECTION_LOST_TIMEOUT_S,
   PROXIMITY_RADIUS_M,
@@ -29,13 +30,21 @@ type OrderInfo = {
   review_flag_reason?: string | null;
 };
 type Rider = { name: string; phone: string } | null;
-type Loc = { lat: number; lng: number; accuracy_m: number; heading: number | null; recorded_at: string };
+type Loc = {
+  lat: number;
+  lng: number;
+  accuracy_m: number;
+  heading: number | null;
+  speed_kmh: number | null;
+  recorded_at: string;
+};
 
 export function CustomerTrackingClient({ token }: { token: string }) {
   const [screen, setScreen] = useState<"loading" | "invalid" | "live">("loading");
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [rider, setRider] = useState<Rider>(null);
   const [loc, setLoc] = useState<Loc | null>(null);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
   const [connectionLost, setConnectionLost] = useState(false);
   const [completing, setCompleting] = useState(false);
   // Tracks which response is in flight, not just whether one is -- so only
@@ -247,6 +256,13 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           {order.address_detail && (
             <p className="text-sm text-brand-navy/70">{order.address_detail}</p>
           )}
+          {(etaSeconds != null || loc?.speed_kmh != null) && (
+            <p className="text-sm text-brand-navy/70">
+              {etaSeconds != null && formatEta(etaSeconds)}
+              {etaSeconds != null && loc?.speed_kmh != null && " · "}
+              {loc?.speed_kmh != null && formatRiderSpeed(loc.speed_kmh)}
+            </p>
+          )}
         </div>
       )}
       {connectionLost && (
@@ -266,6 +282,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
               ? { lat: order.delivery_lat, lng: order.delivery_lng }
               : null
           }
+          onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
         />
       </div>
       <div className="flex items-center gap-3 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">

@@ -41,7 +41,8 @@ export async function GET(req: Request) {
   }
 
   const data = await res.json();
-  const coords: [number, number][] | undefined = data.routes?.[0]?.geometry?.coordinates;
+  const route = data.routes?.[0];
+  const coords: [number, number][] | undefined = route?.geometry?.coordinates;
   if (!coords) {
     return NextResponse.json({ status: "no_route" });
   }
@@ -49,5 +50,9 @@ export async function GET(req: Request) {
   // OSRM returns [lng, lat] pairs; flip to the [lat, lng] convention this
   // app standardized on for Leaflet.
   const points = coords.map(([lng, lat]) => ({ lat, lng }));
-  return NextResponse.json({ status: "ok", points });
+  // OSRM already estimates travel time (seconds) for this same route call --
+  // reuse it for the ETA display instead of a second request/service.
+  const durationSeconds: number | null =
+    typeof route.duration === "number" ? route.duration : null;
+  return NextResponse.json({ status: "ok", points, durationSeconds });
 }

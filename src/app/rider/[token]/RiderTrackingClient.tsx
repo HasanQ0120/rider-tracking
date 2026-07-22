@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { getOrCreateDeviceKey } from "@/lib/deviceKey";
 import { haversineMeters } from "@/lib/geo";
+import { formatEta, formatRiderSpeed } from "@/lib/format";
 import {
   LOCATION_MIN_INTERVAL_MS,
   MAX_ACCURACY_M,
@@ -62,6 +63,8 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const [arrivedTapped, setArrivedTapped] = useState(false);
   const [ownPosition, setOwnPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [ownHeading, setOwnHeading] = useState<number | null>(null);
+  const [ownSpeedKmh, setOwnSpeedKmh] = useState<number | null>(null);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [arrivedBusy, setArrivedBusy] = useState(false);
@@ -175,6 +178,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
             // order) rather than in the browser, so the rider's own arrow
             // and the customer's copy of it always agree.
             if (typeof data.heading === "number") setOwnHeading(data.heading);
+            if (typeof data.speedKmh === "number") setOwnSpeedKmh(data.speedKmh);
             break;
           case "inaccurate":
             setWaitingForAccuracy(true);
@@ -426,6 +430,13 @@ export function RiderTrackingClient({ token }: { token: string }) {
           {order.address_detail && (
             <p className="text-sm text-brand-navy/70">{order.address_detail}</p>
           )}
+          {(etaSeconds != null || ownSpeedKmh != null) && (
+            <p className="text-sm text-brand-navy/70">
+              {etaSeconds != null && formatEta(etaSeconds)}
+              {etaSeconds != null && ownSpeedKmh != null && " · "}
+              {ownSpeedKmh != null && formatRiderSpeed(ownSpeedKmh)}
+            </p>
+          )}
         </div>
       )}
       {waitingForAccuracy && (
@@ -443,6 +454,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
               ? { lat: order.delivery_lat, lng: order.delivery_lng }
               : null
           }
+          onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
         />
       </div>
       <div className="flex flex-col gap-2 border-t border-brand-navy/10 bg-white p-4 shadow-[0_-2px_8px_rgba(10,25,47,0.05)]">

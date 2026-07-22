@@ -123,5 +123,5 @@ export async function POST(
     await supabase.from("orders").update({ status: "in_transit" }).eq("id", order.id);
   }
 
-  return NextResponse.json({ status: "ok", speedImplausible, heading });
+  return NextResponse.json({ status: "ok", speedImplausible, heading, speedKmh });
 }
