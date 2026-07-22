@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap } from "@/components/map/TrackingMap";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
+import { scrollToError } from "@/lib/scrollToError";
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
 
@@ -40,6 +41,21 @@ export function NewOrderForm() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const errorBannerRef = useRef<HTMLDivElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  function showFormError(message: string) {
+    setError(message);
+    // Deferred a tick -- the banner doesn't exist in the DOM yet on the
+    // render that sets it, so scrolling immediately would target nothing.
+    requestAnimationFrame(() => scrollToError(errorBannerRef));
+  }
+
+  function showPhoneError(message: string) {
+    setPhoneError(message);
+    requestAnimationFrame(() => scrollToError(phoneInputRef));
+  }
 
   async function searchAddress() {
     if (!address.trim()) return;
@@ -91,11 +107,11 @@ export function NewOrderForm() {
 
   async function submit() {
     if (!selected) {
-      setError("Please search for and select the delivery address first.");
+      showFormError("Please search for and select the delivery address first.");
       return;
     }
     if (!isValidPakistaniMobile(customerPhone)) {
-      setPhoneError(PK_MOBILE_HINT);
+      showPhoneError(PK_MOBILE_HINT);
       return;
     }
     setSubmitting(true);
@@ -117,12 +133,12 @@ export function NewOrderForm() {
       if (data.order) {
         router.push(`/ops/orders/${data.order.id}`);
       } else if (data.status === "invalid_phone") {
-        setPhoneError(PK_MOBILE_HINT);
+        showPhoneError(PK_MOBILE_HINT);
       } else {
-        setError("Failed to create order.");
+        showFormError("Failed to create order.");
       }
     } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      showFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -130,7 +146,11 @@ export function NewOrderForm() {
 
   return (
     <div className="space-y-6">
-      {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+      {error && (
+        <div ref={errorBannerRef}>
+          <StatusBanner tone="danger">{error}</StatusBanner>
+        </div>
+      )}
 
       <Card title="Customer">
         <div className="space-y-3">
@@ -141,6 +161,7 @@ export function NewOrderForm() {
           />
           <div>
             <Input
+              ref={phoneInputRef}
               placeholder="Customer phone (e.g. 03XXXXXXXXX)"
               value={customerPhone}
               onChange={(e) => {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
+import { scrollToError } from "@/lib/scrollToError";
 
 type Rider = { id: string; name: string; phone: string; active: boolean; created_at: string };
 
@@ -15,10 +16,16 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  function showPhoneError(message: string) {
+    setPhoneError(message);
+    requestAnimationFrame(() => scrollToError(phoneInputRef));
+  }
 
   async function addRider() {
     if (!isValidPakistaniMobile(phone)) {
-      setPhoneError(PK_MOBILE_HINT);
+      showPhoneError(PK_MOBILE_HINT);
       return;
     }
     setSubmitting(true);
@@ -34,7 +41,7 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
       setName("");
       setPhone("");
     } else if (data.status === "invalid_phone") {
-      setPhoneError(PK_MOBILE_HINT);
+      showPhoneError(PK_MOBILE_HINT);
     }
   }
 
@@ -45,6 +52,7 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
           <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <div>
             <Input
+              ref={phoneInputRef}
               placeholder="Phone (e.g. 03XXXXXXXXX)"
               value={phone}
               onChange={(e) => {
