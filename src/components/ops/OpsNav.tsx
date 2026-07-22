@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NavLinkHint } from "@/components/ops/NavLinkHint";
 
 const links = [
   { href: "/ops", label: "Orders" },
@@ -18,13 +19,14 @@ export function OpsNav() {
           <Link
             key={link.href}
             href={link.href}
-            className={`border-b-2 pb-1 text-sm transition-colors ${
+            className={`flex items-center gap-1.5 border-b-2 pb-1 text-sm transition-colors ${
               active
                 ? "border-brand-gold text-white"
                 : "border-transparent text-white/70 hover:border-white/30 hover:text-white"
             }`}
           >
             {link.label}
+            <NavLinkHint />
           </Link>
         );
       })}
