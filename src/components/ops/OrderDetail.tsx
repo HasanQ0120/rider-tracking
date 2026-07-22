@@ -161,16 +161,30 @@ export function OrderDetail({
 
       {(activeRiderToken || activeCustomerToken) && (
         <Card title="Active Links" className="animate-fade-in">
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             {activeRiderToken && (
-              <p className="break-all text-sm text-brand-navy/80">
-                Rider: {origin}/rider/{activeRiderToken.token}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate text-sm text-brand-navy/80">
+                  Rider: {origin}/rider/{activeRiderToken.token}
+                </p>
+                <a href={`/rider/${activeRiderToken.token}`} target="_blank" rel="noopener noreferrer">
+                  <Button variant="accent-outline" size="sm" className="w-40 shrink-0">
+                    Open Rider Link
+                  </Button>
+                </a>
+              </div>
             )}
             {activeCustomerToken && (
-              <p className="break-all text-sm text-brand-navy/80">
-                Customer: {origin}/customer/{activeCustomerToken.token}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate text-sm text-brand-navy/80">
+                  Customer: {origin}/customer/{activeCustomerToken.token}
+                </p>
+                <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
+                  <Button variant="accent-outline" size="sm" className="w-40 shrink-0">
+                    Open Customer Link
+                  </Button>
+                </a>
+              </div>
             )}
           </div>
         </Card>
