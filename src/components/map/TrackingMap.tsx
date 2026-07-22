@@ -138,7 +138,13 @@ export function TrackingMap({
   // restart-on-every-render bug made the marker perpetually ease toward its
   // target in ever-smaller increments instead of gliding there once.
   const markerTargetRefs = useRef<Record<string, LatLng>>({});
-  const hasFitRef = useRef(false);
+  // Throttle state for the continuous re-fit below, mirroring the route
+  // line's own refetch throttle just above.
+  const lastFitAtRef = useRef(0);
+  // Real user drags fire Leaflet's own 'dragstart' event; our own
+  // setView/fitBounds calls below don't. Once someone's manually panned,
+  // stop auto-recentering so it doesn't fight them.
+  const userPannedRef = useRef(false);
   const routeLineRef = useRef<Leaflet.Polyline | null>(null);
   const lastRouteFetchRef = useRef<{ at: number; from: LatLng | null }>({ at: 0, from: null });
   // Forces the marker effect below to re-run once the async Leaflet import
@@ -187,6 +193,9 @@ export function TrackingMap({
       map.on("click", (e: Leaflet.LeafletMouseEvent) => {
         onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
       });
+      map.on("dragstart", () => {
+        userPannedRef.current = true;
+      });
 
       setReady(true);
     });
@@ -197,6 +206,8 @@ export function TrackingMap({
       markerAnimRefs.current = {};
       markerHeadingRefs.current = {};
       markerTargetRefs.current = {};
+      userPannedRef.current = false;
+      lastFitAtRef.current = 0;
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -279,8 +290,27 @@ export function TrackingMap({
       }
     }
 
-    if (!hasFitRef.current && markers.length > 0) {
-      hasFitRef.current = true;
+    // Keeps the view fit to the current markers throughout the whole
+    // tracking session, not just once at mount. A one-time fit made sense
+    // visually for whatever the rider's starting distance from the
+    // delivery address happened to be, but it then never changed again --
+    // as the rider closed in, the same frozen wide view stayed put, so a
+    // real few-meters-per-tick movement kept shrinking as a fraction of an
+    // unchanging frame. At a fixed zoom chosen for a multi-km starting gap,
+    // that real movement -- and ordinary multi-meter GPS noise right along
+    // with it -- becomes sub-pixel, which is what actually read as the
+    // marker "barely moving" and "jittering": it was never an animation bug,
+    // the map was just zoomed too far out for the movement to be visible.
+    // Re-fitting on this same cadence lets the zoom tighten automatically as
+    // the gap closes. Paused once the user manually pans (userPannedRef),
+    // so this doesn't fight someone deliberately looking elsewhere.
+    const now = Date.now();
+    if (
+      markers.length > 0 &&
+      !userPannedRef.current &&
+      now - lastFitAtRef.current >= ROUTE_REFETCH_MIN_INTERVAL_MS
+    ) {
+      lastFitAtRef.current = now;
       if (markers.length === 1) {
         map.setView([markers[0].lat, markers[0].lng], map.getZoom());
       } else {
