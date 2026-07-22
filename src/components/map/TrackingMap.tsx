@@ -131,6 +131,13 @@ export function TrackingMap({
   // Last commanded rotation per arrow marker, used as the animation's
   // starting angle for the next update (see shortestAngleDelta above).
   const markerHeadingRefs = useRef<Record<string, number>>({});
+  // Last lat/lng this marker was actually commanded to animate towards --
+  // deliberately separate from the marker's live (still-easing) visual
+  // position below, so an unrelated re-render landing mid-glide (e.g. an
+  // ETA fetch resolving) doesn't restart the animation over and over. That
+  // restart-on-every-render bug made the marker perpetually ease toward its
+  // target in ever-smaller increments instead of gliding there once.
+  const markerTargetRefs = useRef<Record<string, LatLng>>({});
   const hasFitRef = useRef(false);
   const routeLineRef = useRef<Leaflet.Polyline | null>(null);
   const lastRouteFetchRef = useRef<{ at: number; from: LatLng | null }>({ at: 0, from: null });
@@ -189,6 +196,7 @@ export function TrackingMap({
       Object.values(markerAnimRefs.current).forEach(cancelAnimationFrame);
       markerAnimRefs.current = {};
       markerHeadingRefs.current = {};
+      markerTargetRefs.current = {};
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -206,14 +214,24 @@ export function TrackingMap({
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
-        // Skip re-animating a marker that's already sitting at its target --
+        // Skip re-animating unless the commanded target actually moved --
         // e.g. right after the user's own drag already put it exactly there
-        // (see dragend below), where re-animating A -> A would be pointless
-        // and could visually fight an in-progress native drag.
-        const current = existing.getLatLng();
-        if (Math.abs(current.lat - marker.lat) < 1e-9 && Math.abs(current.lng - marker.lng) < 1e-9) {
+        // (see dragend below), or a re-render fired for an unrelated reason
+        // (ETA/speed state updating) while this marker's target hasn't
+        // changed. Deliberately compares against the last *commanded*
+        // target, not the marker's current mid-glide visual position --
+        // otherwise every such re-render would cancel and restart the
+        // animation from wherever it happened to be, which reads as the
+        // marker barely creeping instead of gliding smoothly to place.
+        const lastTarget = markerTargetRefs.current[marker.id];
+        if (
+          lastTarget &&
+          Math.abs(lastTarget.lat - marker.lat) < 1e-9 &&
+          Math.abs(lastTarget.lng - marker.lng) < 1e-9
+        ) {
           continue;
         }
+        markerTargetRefs.current[marker.id] = { lat: marker.lat, lng: marker.lng };
 
         const prevFrame = markerAnimRefs.current[marker.id];
         if (prevFrame) cancelAnimationFrame(prevFrame);
@@ -256,6 +274,7 @@ export function TrackingMap({
           });
         }
         markerRefs.current[marker.id] = m;
+        markerTargetRefs.current[marker.id] = { lat: marker.lat, lng: marker.lng };
         if (isArrow) markerHeadingRefs.current[marker.id] = marker.heading ?? 0;
       }
     }
