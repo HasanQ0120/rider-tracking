@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap } from "@/components/map/TrackingMap";
+import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
 
@@ -30,6 +31,7 @@ export function NewOrderForm() {
   const router = useRouter();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [address, setAddress] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
   const [candidates, setCandidates] = useState<GeocodeResult[]>([]);
@@ -92,6 +94,10 @@ export function NewOrderForm() {
       setError("Please search for and select the delivery address first.");
       return;
     }
+    if (!isValidPakistaniMobile(customerPhone)) {
+      setPhoneError(PK_MOBILE_HINT);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -100,7 +106,7 @@ export function NewOrderForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_name: customerName,
-          customer_phone: customerPhone,
+          customer_phone: cleanPhoneInput(customerPhone),
           delivery_address: selected.placeName,
           delivery_lat: selected.lat,
           delivery_lng: selected.lng,
@@ -110,6 +116,8 @@ export function NewOrderForm() {
       const data = await res.json();
       if (data.order) {
         router.push(`/ops/orders/${data.order.id}`);
+      } else if (data.status === "invalid_phone") {
+        setPhoneError(PK_MOBILE_HINT);
       } else {
         setError("Failed to create order.");
       }
@@ -131,11 +139,27 @@ export function NewOrderForm() {
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
           />
-          <Input
-            placeholder="Customer phone"
-            value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
-          />
+          <div>
+            <Input
+              placeholder="Customer phone (e.g. 03XXXXXXXXX)"
+              value={customerPhone}
+              onChange={(e) => {
+                setCustomerPhone(e.target.value);
+                if (phoneError) setPhoneError(null);
+              }}
+              onBlur={() => {
+                if (customerPhone.trim() && !isValidPakistaniMobile(customerPhone)) {
+                  setPhoneError(PK_MOBILE_HINT);
+                }
+              }}
+              className={phoneError ? "border-status-danger" : ""}
+            />
+            {phoneError && (
+              <p className="mt-1 text-sm text-status-danger" role="alert">
+                {phoneError}
+              </p>
+            )}
+          </div>
         </div>
       </Card>
 

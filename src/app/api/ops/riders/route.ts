@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
+import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
 
 export async function GET() {
   const guard = await requireOpsUserApi();
@@ -24,11 +25,14 @@ export async function POST(req: Request) {
   if (!name || !phone) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
+  if (!isValidPakistaniMobile(phone)) {
+    return NextResponse.json({ status: "invalid_phone" }, { status: 400 });
+  }
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("riders")
-    .insert({ name, phone })
+    .insert({ name, phone: cleanPhoneInput(phone) })
     .select()
     .single();
 
