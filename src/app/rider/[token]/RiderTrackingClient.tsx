@@ -6,6 +6,7 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { CallButton } from "@/components/ui/CallButton";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
 import { getOrCreateDeviceKey } from "@/lib/deviceKey";
 import { haversineMeters } from "@/lib/geo";
@@ -64,6 +65,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [arrivedBusy, setArrivedBusy] = useState(false);
   const [deliveredBusy, setDeliveredBusy] = useState(false);
+  const [showDeliveredConfirm, setShowDeliveredConfirm] = useState(false);
 
   const deviceKeyRef = useRef<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -248,6 +250,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const tapDelivered = useCallback(async () => {
     if (deliveredBusy) return;
     setDeliveredBusy(true);
+    setShowDeliveredConfirm(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
     try {
       // Tapping this no longer means "instantly delivered" -- the backend
@@ -447,7 +450,11 @@ export function RiderTrackingClient({ token }: { token: string }) {
             </Button>
           </div>
         )}
-        <Button className="w-full" onClick={tapDelivered} disabled={deliveredBusy}>
+        <Button
+          className="w-full"
+          onClick={() => setShowDeliveredConfirm(true)}
+          disabled={deliveredBusy}
+        >
           {deliveredBusy && <Spinner className="h-4 w-4" />}
           Mark as Delivered
         </Button>
@@ -463,6 +470,15 @@ export function RiderTrackingClient({ token }: { token: string }) {
               : "Resend my tracking link"}
         </button>
       </div>
+      <ConfirmDialog
+        open={showDeliveredConfirm}
+        title="Mark as Delivered?"
+        message={`Are you sure? If you're more than ${PROXIMITY_RADIUS_M}m from the customer's address, this delivery will be flagged for review and our team will follow up with you.`}
+        confirmLabel="Yes, Mark as Delivered"
+        confirming={deliveredBusy}
+        onConfirm={tapDelivered}
+        onCancel={() => setShowDeliveredConfirm(false)}
+      />
     </div>
   );
 }

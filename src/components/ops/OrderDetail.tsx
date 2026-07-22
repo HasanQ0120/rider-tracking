@@ -61,15 +61,21 @@ export function OrderDetail({
   const router = useRouter();
   const [selectedRider, setSelectedRider] = useState(riders[0]?.id ?? "");
   const [needsConfirm, setNeedsConfirm] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Tracks exactly which action is in flight, not just whether *something*
+  // is -- so only the button actually clicked shows its own spinner while
+  // the others just go inert, instead of every button spinning at once.
+  const [busyAction, setBusyAction] = useState<null | "assign" | "reassign" | "reset" | "cancel">(
+    null
+  );
   const [message, setMessage] = useState<string | null>(null);
+  const busy = busyAction !== null;
 
   const activeRiderToken = tokens.find((t) => t.type === "rider" && t.active);
   const activeCustomerToken = tokens.find((t) => t.type === "customer" && t.active);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   async function assign(confirmReassign = false) {
-    setBusy(true);
+    setBusyAction(confirmReassign ? "reassign" : "assign");
     setMessage(null);
     const res = await fetch(`/api/ops/orders/${order.id}/assign`, {
       method: "POST",
@@ -77,7 +83,7 @@ export function OrderDetail({
       body: JSON.stringify({ riderId: selectedRider, confirmReassign }),
     });
     const data = await res.json();
-    setBusy(false);
+    setBusyAction(null);
     if (data.status === "needs_confirmation") {
       setNeedsConfirm(true);
       return;
@@ -96,18 +102,22 @@ export function OrderDetail({
   }
 
   async function resetSession() {
-    setBusy(true);
+    setBusyAction("reset");
     const res = await fetch(`/api/ops/orders/${order.id}/reset-session`, { method: "POST" });
     const data = await res.json();
-    setBusy(false);
+    setBusyAction(null);
     setMessage(data.status === "ok" ? "Session reset. Rider must re-enter PIN on new device." : `Failed: ${data.status}`);
   }
 
   async function cancelOrder() {
-    setBusy(true);
+    setBusyAction("cancel");
     const res = await fetch(`/api/ops/orders/${order.id}/cancel`, { method: "POST" });
-    setBusy(false);
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setBusyAction(null);
+      setMessage("Failed to cancel order.");
+    }
   }
 
   return (
@@ -168,8 +178,12 @@ export function OrderDetail({
               ))}
             </Select>
             <Button onClick={() => assign(false)} disabled={busy || !selectedRider}>
-              {busy && <Spinner className="h-4 w-4" />}
-              {order.assigned_rider_id ? "Reassign" : "Assign"}
+              {busyAction === "assign" && <Spinner className="h-4 w-4" />}
+              {busyAction === "assign"
+                ? "Assigning…"
+                : order.assigned_rider_id
+                  ? "Reassign"
+                  : "Assign"}
             </Button>
           </div>
           {needsConfirm && (
@@ -179,7 +193,8 @@ export function OrderDetail({
                 rider&apos;s link will be revoked immediately.
               </StatusBanner>
               <Button onClick={() => assign(true)} disabled={busy}>
-                Confirm Reassignment
+                {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
+                {busyAction === "reassign" ? "Reassigning…" : "Confirm Reassignment"}
               </Button>
             </div>
           )}
@@ -224,7 +239,8 @@ export function OrderDetail({
             device can verify the PIN.
           </p>
           <Button variant="accent-outline" onClick={resetSession} disabled={busy}>
-            Reset Tracking Session
+            {busyAction === "reset" && <Spinner className="h-4 w-4" />}
+            {busyAction === "reset" ? "Resetting…" : "Reset Tracking Session"}
           </Button>
         </Card>
       )}
@@ -235,9 +251,10 @@ export function OrderDetail({
           <button
             onClick={cancelOrder}
             disabled={busy}
-            className="rounded-xl border-2 border-status-danger px-5 py-3 font-semibold text-status-danger transition-all duration-150 hover:bg-status-danger/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-status-danger px-5 py-3 font-semibold text-status-danger transition-all duration-150 hover:bg-status-danger/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Cancel Order
+            {busyAction === "cancel" && <Spinner className="h-4 w-4" />}
+            {busyAction === "cancel" ? "Cancelling…" : "Cancel Order"}
           </button>
         </div>
       )}

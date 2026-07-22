@@ -37,7 +37,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const [loc, setLoc] = useState<Loc | null>(null);
   const [connectionLost, setConnectionLost] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  // Tracks which response is in flight, not just whether one is -- so only
+  // the button actually tapped shows its own spinner.
+  const [confirmingResponse, setConfirmingResponse] = useState<"yes" | "no" | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -119,8 +121,8 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
   const respondToConfirmation = useCallback(
     async (response: "yes" | "no") => {
-      if (confirming) return;
-      setConfirming(true);
+      if (confirmingResponse) return;
+      setConfirmingResponse(response);
       try {
         const res = await fetch(`/api/customer/${token}/confirm-delivery`, {
           method: "POST",
@@ -132,10 +134,10 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           setOrder({ ...order, status: data.resolvedStatus });
         }
       } finally {
-        setConfirming(false);
+        setConfirmingResponse(null);
       }
     },
-    [token, order, confirming]
+    [token, order, confirmingResponse]
   );
 
   if (screen === "loading") return <CenteredMessage>Loading…</CenteredMessage>;
@@ -176,17 +178,22 @@ export function CustomerTrackingClient({ token }: { token: string }) {
             Your rider has marked this as delivered — did you receive your order?
           </p>
           <div className="flex gap-3">
-            <Button className="flex-1" onClick={() => respondToConfirmation("yes")} disabled={confirming}>
-              {confirming && <Spinner className="h-4 w-4" />}
-              Yes
+            <Button
+              className="flex-1"
+              onClick={() => respondToConfirmation("yes")}
+              disabled={confirmingResponse !== null}
+            >
+              {confirmingResponse === "yes" && <Spinner className="h-4 w-4" />}
+              {confirmingResponse === "yes" ? "Confirming…" : "Yes"}
             </Button>
             <Button
               variant="accent-outline"
               className="flex-1"
               onClick={() => respondToConfirmation("no")}
-              disabled={confirming}
+              disabled={confirmingResponse !== null}
             >
-              No
+              {confirmingResponse === "no" && <Spinner className="h-4 w-4" />}
+              {confirmingResponse === "no" ? "Submitting…" : "No"}
             </Button>
           </div>
           {rider && <CallButton phone={rider.phone} label="Call Rider" />}
