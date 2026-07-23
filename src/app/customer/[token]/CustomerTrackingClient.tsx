@@ -275,21 +275,44 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       : null;
   const etaMinutes = etaSeconds != null ? Math.max(1, Math.round(etaSeconds / 60)) : null;
   const isRiderAssigned = Boolean(order.assigned_rider_id);
+  // A rider is assigned but hasn't sent a location yet (link not opened,
+  // permission not granted, or no GPS fix yet) -- a bare map with nothing
+  // but the destination pin reads as broken, not "in progress." Resolves
+  // itself automatically the instant a real `loc` comes back from the same
+  // poll() -> setLoc path that already drives every other live transition
+  // on this page, no separate polling needed. Deliberately scoped to "rider
+  // assigned" only -- before that, the existing "Rider not yet assigned"
+  // bottom banner already covers it, so the map there is left as-is.
+  const waitingForLocation = Boolean(rider) && !loc;
 
   return (
     <div className="relative h-screen overflow-hidden bg-surface">
       <div className="absolute inset-0">
-        <TrackingMap
-          markers={markers}
-          defaultCenter={defaultCenter}
-          routeFrom={loc}
-          routeTo={
-            order.delivery_lat != null && order.delivery_lng != null
-              ? { lat: order.delivery_lat, lng: order.delivery_lng }
-              : null
-          }
-          onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
-        />
+        {waitingForLocation ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-white/30">
+              <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth={1.6}>
+                <path d="M9 4l-5 2v14l5-2 6 2 5-2V4l-5 2-6-2z" />
+                <path d="M9 4v14M15 6v14" />
+              </svg>
+            </div>
+            <p className="max-w-xs text-sm text-white/50">
+              Waiting for your rider to start sharing their location.
+            </p>
+          </div>
+        ) : (
+          <TrackingMap
+            markers={markers}
+            defaultCenter={defaultCenter}
+            routeFrom={loc}
+            routeTo={
+              order.delivery_lat != null && order.delivery_lng != null
+                ? { lat: order.delivery_lat, lng: order.delivery_lng }
+                : null
+            }
+            onRouteInfo={(info) => setEtaSeconds(info?.durationSeconds ?? null)}
+          />
+        )}
       </div>
 
       {/* z-[2000] matches ConfirmDialog's -- Leaflet's own panes/controls
