@@ -87,7 +87,14 @@ export async function POST(
 
   await supabase
     .from("orders")
-    .update({ assigned_rider_id: riderId, status: isReassignment ? order.status : "assigned" })
+    .update({
+      assigned_rider_id: riderId,
+      status: isReassignment ? order.status : "assigned",
+      // Drives current-vs-queued ranking when a rider has multiple active
+      // orders (see src/lib/orderQueue.ts) -- reassignment counts as a new
+      // assignment relationship, so it re-ranks too, not just first-time.
+      assigned_at: new Date().toISOString(),
+    })
     .eq("id", orderId);
 
   await sendRiderLink(rider.phone, riderTokenStr);

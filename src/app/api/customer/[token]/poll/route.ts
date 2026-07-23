@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getOrdersAhead } from "@/lib/orderQueue";
 
 // Without this, Next.js can serve a cached response for this GET route
 // (its Full Route Cache applies to GET handlers by default) and/or
@@ -45,19 +46,28 @@ export async function GET(
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, status, rider_arrived_at, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason"
+      "id, status, rider_arrived_at, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, assigned_rider_id"
     )
     .eq("id", tokenRow.order_id)
     .single();
 
-  const { data: loc } = await supabase
-    .from("current_locations")
-    .select("lat, lng, accuracy_m, heading, speed_kmh, recorded_at")
-    .eq("order_id", tokenRow.order_id)
-    .maybeSingle();
+  const ordersAhead = order ? await getOrdersAhead(supabase, order) : 0;
+
+  // While queued behind another of the same rider's deliveries, never fetch
+  // (let alone return) the rider's actual current position -- the queued
+  // screen has no map to put it on, and this keeps that position from ever
+  // reaching a queued customer's browser at all, not just going unrendered.
+  const { data: loc } =
+    ordersAhead > 0
+      ? { data: null }
+      : await supabase
+          .from("current_locations")
+          .select("lat, lng, accuracy_m, heading, speed_kmh, recorded_at")
+          .eq("order_id", tokenRow.order_id)
+          .maybeSingle();
 
   return NextResponse.json(
-    { status: "ok", order, loc },
+    { status: "ok", order: order ? { ...order, orders_ahead: ordersAhead } : order, loc },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getOrdersAhead } from "@/lib/orderQueue";
 
 export async function POST(
   _req: Request,
@@ -35,6 +36,8 @@ export async function POST(
     return NextResponse.json({ status: "invalid" }, { status: 404 });
   }
 
+  const ordersAhead = await getOrdersAhead(supabase, order);
+
   let rider: { name: string; phone: string; license_plate: string | null } | null = null;
   if (order.assigned_rider_id) {
     const { data } = await supabase
@@ -47,7 +50,7 @@ export async function POST(
 
   return NextResponse.json({
     status: "ok",
-    order,
+    order: { ...order, orders_ahead: ordersAhead },
     rider,
   });
 }

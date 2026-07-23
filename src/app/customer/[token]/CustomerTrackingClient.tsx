@@ -29,6 +29,12 @@ type OrderInfo = {
   delivery_confirmed_by?: string | null;
   review_flag_reason?: string | null;
   assigned_rider_id?: string | null;
+  // 0 (or absent) means this is the rider's current delivery -- show the
+  // normal live map. N>0 means N of the rider's other active orders were
+  // assigned before this one; show the queued message instead, never the
+  // map/ETA. Recomputed server-side on every poll, so this naturally
+  // ticks down (and eventually reaches 0) as those earlier orders resolve.
+  orders_ahead?: number;
 };
 type Rider = { name: string; phone: string; license_plate: string | null } | null;
 type Loc = {
@@ -208,6 +214,20 @@ export function CustomerTrackingClient({ token }: { token: string }) {
             </Button>
           </div>
           {rider && <CallButton phone={rider.phone} label="Call Rider" />}
+        </Card>
+      </div>
+    );
+  }
+  if (order.orders_ahead && order.orders_ahead > 0) {
+    const n = order.orders_ahead;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
+        <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
+          <StatusBanner tone="warning">
+            {`Your rider has picked up your order. He's currently completing ${n} other ${
+              n === 1 ? "delivery" : "deliveries"
+            } first — you're next after that.`}
+          </StatusBanner>
         </Card>
       </div>
     );
