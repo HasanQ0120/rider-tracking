@@ -110,11 +110,19 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     };
   }, [loc]);
 
+  // True whenever this order isn't yet the rider's current delivery -- see
+  // src/lib/orderQueue.ts. Gates the rider marker/route/ETA/courier-card
+  // out of the shared live-tracking render below rather than a separate
+  // early-return, so this order falls through to the exact same live view
+  // as any other the instant orders_ahead reaches 0 (no new mechanism).
+  const isQueued = Boolean(order?.orders_ahead && order.orders_ahead > 0);
+
   // The rider-initiated confirmation flow (pending_confirmation/
   // flagged_review) replaces this generic button for those two states --
   // it's still available independently otherwise, e.g. if the customer
   // wants to confirm before the rider has tapped anything.
   const canComplete =
+    !isQueued &&
     order?.status !== "delivered" &&
     order?.status !== "cancelled" &&
     order?.status !== "pending_confirmation" &&
@@ -218,20 +226,6 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       </div>
     );
   }
-  if (order.orders_ahead && order.orders_ahead > 0) {
-    const n = order.orders_ahead;
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface p-6">
-        <Card className="w-full max-w-sm animate-scale-in space-y-3 text-center">
-          <StatusBanner tone="warning">
-            {`Your rider has picked up your order. He's currently completing ${n} other ${
-              n === 1 ? "delivery" : "deliveries"
-            } first — you're next after that.`}
-          </StatusBanner>
-        </Card>
-      </div>
-    );
-  }
   // Distinguished from the generic "connection lost" state: this means the
   // rider's own link expired and a fresh one is being (re)issued, not that
   // the order was ever marked delivered.
@@ -253,7 +247,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   if (order.delivery_lat != null && order.delivery_lng != null) {
     markers.push({ id: "delivery", lat: order.delivery_lat, lng: order.delivery_lng, color: MARKER_COLOR_CUSTOMER });
   }
-  if (loc) {
+  if (!isQueued && loc) {
     markers.push({
       id: "rider",
       lat: loc.lat,
@@ -270,7 +264,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       : [0, 0];
 
   const distanceKm =
-    loc && order.delivery_lat != null && order.delivery_lng != null
+    !isQueued && loc && order.delivery_lat != null && order.delivery_lng != null
       ? haversineMeters(loc.lat, loc.lng, order.delivery_lat, order.delivery_lng) / 1000
       : null;
   const etaMinutes = etaSeconds != null ? Math.max(1, Math.round(etaSeconds / 60)) : null;
@@ -282,8 +276,15 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   // poll() -> setLoc path that already drives every other live transition
   // on this page, no separate polling needed. Deliberately scoped to "rider
   // assigned" only -- before that, the existing "Rider not yet assigned"
-  // bottom banner already covers it, so the map there is left as-is.
-  const waitingForLocation = Boolean(rider) && !loc;
+  // bottom banner already covers it, so the map there is left as-is. The
+  // queue message always wins over this for a queued order.
+  const waitingForLocation = !isQueued && Boolean(rider) && !loc;
+  const queueMessage = (() => {
+    const n = order.orders_ahead ?? 0;
+    return `Your rider has picked up your order. He's currently completing ${n} other ${
+      n === 1 ? "delivery" : "deliveries"
+    } first — you're next after that.`;
+  })();
 
   return (
     <div className="relative h-screen overflow-hidden bg-surface">
@@ -304,9 +305,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           <TrackingMap
             markers={markers}
             defaultCenter={defaultCenter}
-            routeFrom={loc}
+            routeFrom={isQueued ? null : loc}
             routeTo={
-              order.delivery_lat != null && order.delivery_lng != null
+              !isQueued && order.delivery_lat != null && order.delivery_lng != null
                 ? { lat: order.delivery_lat, lng: order.delivery_lng }
                 : null
             }
@@ -332,7 +333,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
           <div className={`min-w-0 flex-1 ${etaMinutes != null ? "border-l border-white/10 pl-4" : ""}`}>
             <p className="flex items-center gap-1.5 text-sm font-medium text-brand-gold">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
-              {isRiderAssigned ? "Your rider is on the way" : "Preparing your order"}
+              {isQueued ? queueMessage : isRiderAssigned ? "Your rider is on the way" : "Preparing your order"}
             </p>
             {order.delivery_address && (
               <p className="truncate text-xs text-white/50">
@@ -355,47 +356,54 @@ export function CustomerTrackingClient({ token }: { token: string }) {
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-[2000] animate-slide-up border-t border-white/10 bg-surface-raised/95 p-4 shadow-lg backdrop-blur-sm">
-        {rider ? (
-          <>
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-white/50">Your courier</p>
-                <p className="text-base font-semibold text-white">{rider.name}</p>
+      {/* Hidden entirely while queued -- no courier card, no Call button,
+          no Complete button. The rider is real and assigned, but showing
+          their identity/a working call button here reads as "available to
+          you right now," which isn't true while they're still finishing
+          other deliveries first. */}
+      {!isQueued && (
+        <div className="absolute inset-x-0 bottom-0 z-[2000] animate-slide-up border-t border-white/10 bg-surface-raised/95 p-4 shadow-lg backdrop-blur-sm">
+          {rider ? (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Your courier</p>
+                  <p className="text-base font-semibold text-white">{rider.name}</p>
+                </div>
+                {rider.license_plate && (
+                  <p className="rounded-md bg-brand-gold px-2 py-1 text-xs font-semibold tracking-wide text-brand-navy">
+                    {rider.license_plate}
+                  </p>
+                )}
               </div>
-              {rider.license_plate && (
-                <p className="rounded-md bg-brand-gold px-2 py-1 text-xs font-semibold tracking-wide text-brand-navy">
-                  {rider.license_plate}
-                </p>
-              )}
-            </div>
+              <div className="flex items-center gap-3">
+                <div className="animate-fade-in">
+                  <CallButton phone={rider.phone} label="Call Rider" />
+                </div>
+                {canComplete && (
+                  <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
+                    {completing && <Spinner className="h-4 w-4" />}
+                    Complete
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : (
             <div className="flex items-center gap-3">
-              <div className="animate-fade-in">
-                <CallButton phone={rider.phone} label="Call Rider" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/40">
+                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+                </svg>
               </div>
-              {canComplete && (
-                <Button onClick={tapComplete} disabled={completing} className="flex-1 animate-fade-in">
-                  {completing && <Spinner className="h-4 w-4" />}
-                  Complete
-                </Button>
-              )}
+              <div>
+                <p className="text-sm font-medium text-white">Rider not yet assigned</p>
+                <p className="text-xs text-white/50">Your order is being prepared</p>
+              </div>
             </div>
-          </>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/40">
-              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">Rider not yet assigned</p>
-              <p className="text-xs text-white/50">Your order is being prepared</p>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
