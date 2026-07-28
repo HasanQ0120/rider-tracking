@@ -10,6 +10,13 @@ export function generateSessionId(): string {
   return nanoid(24);
 }
 
+// Persistent per-rider "on duty" link -- unlike generateTrackingToken, this
+// one is never expected to expire or be revoked/reissued the way per-order
+// tokens are.
+export function generateDutyToken(): string {
+  return nanoid(28);
+}
+
 export function generateDeviceKey(): string {
   return nanoid(24);
 }

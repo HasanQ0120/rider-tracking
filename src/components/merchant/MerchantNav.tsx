@@ -7,6 +7,7 @@ import { NavLinkHint } from "@/components/ops/NavLinkHint";
 const links = [
   { href: "/merchant", label: "Orders" },
   { href: "/merchant/riders", label: "Riders" },
+  { href: "/merchant/settings", label: "Settings" },
   { href: "/merchant/account", label: "Account" },
 ];
 

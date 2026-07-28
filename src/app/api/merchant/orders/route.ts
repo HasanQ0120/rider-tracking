@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
+import { createServiceClient } from "@/lib/supabase/service";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { runAutoAssignment } from "@/lib/autoAssign";
 
 export async function POST(req: Request) {
   const guard = await requireMerchantUserApi();
@@ -40,5 +42,19 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
-  return NextResponse.json({ order: data });
+
+  // Auto-assignment needs tracking_tokens/pin_codes writes and an orders
+  // update -- none of which the merchant's own RLS policies grant -- so it
+  // runs on a service-role client, explicitly scoped to this one tenant_id
+  // and orderId (not a general-purpose merchant session), same asymmetry
+  // used by the inbound API/Phase 3 design.
+  const service = createServiceClient();
+  await runAutoAssignment(service, guard.tenantId, data.id);
+
+  // Re-fetch rather than returning the pre-assignment `data` -- auto-assignment
+  // (if it ran) updates assigned_rider_id/status on the row, and the caller
+  // needs to see that, not the state from before the insert's own .select().
+  const { data: finalOrder } = await service.from("orders").select().eq("id", data.id).single();
+
+  return NextResponse.json({ order: finalOrder ?? data });
 }

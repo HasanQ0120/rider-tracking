@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { generateDutyToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const guard = await requireMerchantUserApi();
@@ -16,7 +17,13 @@ export async function POST(req: Request) {
 
   const { data, error } = await guard.supabase
     .from("riders")
-    .insert({ tenant_id: guard.tenantId, name, phone: cleanPhoneInput(phone), license_plate })
+    .insert({
+      tenant_id: guard.tenantId,
+      name,
+      phone: cleanPhoneInput(phone),
+      license_plate,
+      duty_token: generateDutyToken(),
+    })
     .select()
     .single();
 

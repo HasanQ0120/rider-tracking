@@ -7,7 +7,7 @@ export default async function MerchantRidersPage() {
   const supabase = await createAuthServerClient();
   const { data: riders } = await supabase
     .from("riders")
-    .select("id, name, phone, license_plate, active, created_at")
+    .select("id, name, phone, license_plate, active, created_at, duty_token")
     .order("created_at", { ascending: false });
 
   const { data: orders } = await supabase.from("orders").select("assigned_rider_id, status");

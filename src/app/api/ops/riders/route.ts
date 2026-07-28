@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
+import { getOpsHomeTenantId } from "@/lib/ops/homeTenant";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { generateDutyToken } from "@/lib/tokens";
 
 export async function GET() {
   const guard = await requireOpsUserApi();
@@ -30,9 +32,16 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServiceClient();
+  const tenantId = await getOpsHomeTenantId(supabase);
   const { data, error } = await supabase
     .from("riders")
-    .insert({ name, phone: cleanPhoneInput(phone), license_plate })
+    .insert({
+      tenant_id: tenantId,
+      name,
+      phone: cleanPhoneInput(phone),
+      license_plate,
+      duty_token: generateDutyToken(),
+    })
     .select()
     .single();
 

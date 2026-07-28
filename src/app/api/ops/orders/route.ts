@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
+import { getOpsHomeTenantId } from "@/lib/ops/homeTenant";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { runAutoAssignment } from "@/lib/autoAssign";
 
 export async function GET() {
   const guard = await requireOpsUserApi();
@@ -40,9 +42,11 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServiceClient();
+  const tenantId = await getOpsHomeTenantId(supabase);
   const { data, error } = await supabase
     .from("orders")
     .insert({
+      tenant_id: tenantId,
       customer_name,
       customer_phone: cleanPhoneInput(customer_phone),
       delivery_address,
@@ -54,5 +58,12 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
-  return NextResponse.json({ order: data });
+
+  await runAutoAssignment(supabase, tenantId, data.id);
+
+  // Re-fetch rather than returning the pre-assignment `data` -- see the
+  // matching comment in /api/merchant/orders.
+  const { data: finalOrder } = await supabase.from("orders").select().eq("id", data.id).single();
+
+  return NextResponse.json({ order: finalOrder ?? data });
 }
