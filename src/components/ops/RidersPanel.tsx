@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
+import { StatusBanner } from "@/components/ui/StatusBanner";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 import { scrollToError } from "@/lib/scrollToError";
+
+type RowError = { line: number; reason: string };
+type BulkResult = { imported: number; errors: RowError[] };
 
 type Rider = {
   id: string;
@@ -24,21 +28,28 @@ type Rider = {
 export function RidersPanel({
   initialRiders,
   createEndpoint = "/api/ops/riders",
+  bulkImportEndpoint = "/api/ops/riders/bulk",
 }: {
   initialRiders: Rider[];
   // Lets the merchant dashboard reuse this exact form/UI against its own
-  // tenant-scoped API route instead of the ops one -- default keeps ops's
+  // tenant-scoped API routes instead of the ops ones -- defaults keep ops's
   // existing behavior completely unchanged.
   createEndpoint?: string;
+  bulkImportEndpoint?: string;
 }) {
   const [riders, setRiders] = useState(initialRiders);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<BulkResult | null>(null);
+  const [importFileError, setImportFileError] = useState<string | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function showPhoneError(message: string) {
     setPhoneError(message);
@@ -73,13 +84,108 @@ export function RidersPanel({
     }
   }
 
+  async function importCsv(file: File) {
+    setImportFileError(null);
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const csv = await file.text();
+      const res = await fetch(bulkImportEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv }),
+      });
+      const data = await res.json();
+      if (data.status !== "ok") {
+        setImportFileError("Failed to import this file.");
+        return;
+      }
+      if (data.riders?.length) {
+        setRiders([
+          ...data.riders.map((r: Rider) => ({ ...r, deliveredCount: 0, activeCount: 0 })),
+          ...riders,
+        ]);
+      }
+      setImportResult({ imported: data.imported ?? 0, errors: data.errors ?? [] });
+    } catch {
+      setImportFileError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <Button onClick={() => setShowAddForm((v) => !v)}>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="accent-outline"
+          onClick={() => {
+            setShowBulkImport((v) => !v);
+            setShowAddForm(false);
+          }}
+        >
+          {showBulkImport ? "Cancel" : "Import CSV"}
+        </Button>
+        <Button
+          onClick={() => {
+            setShowAddForm((v) => !v);
+            setShowBulkImport(false);
+          }}
+        >
           {showAddForm ? "Cancel" : "+ Add Rider"}
         </Button>
       </div>
+
+      {showBulkImport && (
+        <Card title="Bulk Import Riders" className="animate-slide-up">
+          <p className="mb-3 text-sm text-white/50">
+            A CSV file with columns <code className="text-white/70">name</code>,{" "}
+            <code className="text-white/70">phone</code>, and{" "}
+            <code className="text-white/70">license_plate</code> (any column order, header row
+            required).
+          </p>
+          {importFileError && (
+            <div className="mb-3">
+              <StatusBanner tone="danger">{importFileError}</StatusBanner>
+            </div>
+          )}
+          {importResult && (
+            <div className="mb-3 space-y-2">
+              <StatusBanner tone={importResult.errors.length > 0 ? "warning" : "success"}>
+                Imported {importResult.imported} rider{importResult.imported === 1 ? "" : "s"}.
+                {importResult.errors.length > 0 &&
+                  ` ${importResult.errors.length} row${importResult.errors.length === 1 ? "" : "s"} skipped.`}
+              </StatusBanner>
+              {importResult.errors.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-3">
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-white/60">
+                      Line {e.line}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            disabled={importing}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importCsv(file);
+            }}
+            className="block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-gold file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-navy"
+          />
+          {importing && (
+            <p className="mt-2 flex items-center gap-2 text-sm text-white/50">
+              <Spinner className="h-4 w-4" /> Importing…
+            </p>
+          )}
+        </Card>
+      )}
 
       {showAddForm && (
         <Card title="Add Rider" className="animate-slide-up">
