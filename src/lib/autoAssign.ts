@@ -99,40 +99,47 @@ export async function findRiderForAutoAssignment(
   return leastBusy ? leastBusy.riderId : null;
 }
 
+export type AutoAssignOutcome = { riderId: string; riderName: string; riderPhone: string };
+
 // Orchestrates auto-assignment for a freshly-created order: checks the
 // tenant's auto_assign_enabled flag and pickup location, finds a rider, and
 // performs the same tracking-token/PIN/customer-link issuance a manual ops
 // assignment would. A no-op (order stays pending) if auto-assign is off, no
-// pickup location is configured, or no active rider is found.
+// pickup location is configured, or no active rider is found. `pickup`
+// overrides the tenant's default_pickup_lat/lng -- used by the inbound API
+// for multi-branch merchants who pass a per-order pickup point; ops/merchant
+// dashboard callers omit it and always use the tenant's single default.
 export async function runAutoAssignment(
   supabase: SupabaseClient,
   tenantId: string,
-  orderId: string
-): Promise<void> {
+  orderId: string,
+  pickup?: { lat: number; lng: number }
+): Promise<AutoAssignOutcome | null> {
   const { data: tenant } = await supabase
     .from("tenants")
     .select("auto_assign_enabled, default_pickup_lat, default_pickup_lng")
     .eq("id", tenantId)
     .single();
 
-  if (!tenant?.auto_assign_enabled) return;
-  if (tenant.default_pickup_lat == null || tenant.default_pickup_lng == null) return;
+  if (!tenant?.auto_assign_enabled) return null;
+  const pickupLat = pickup?.lat ?? tenant.default_pickup_lat;
+  const pickupLng = pickup?.lng ?? tenant.default_pickup_lng;
+  if (pickupLat == null || pickupLng == null) return null;
 
-  const riderId = await findRiderForAutoAssignment(
-    supabase,
-    tenantId,
-    tenant.default_pickup_lat,
-    tenant.default_pickup_lng
-  );
-  if (!riderId) return;
+  const riderId = await findRiderForAutoAssignment(supabase, tenantId, pickupLat, pickupLng);
+  if (!riderId) return null;
 
-  const { data: rider } = await supabase.from("riders").select("phone").eq("id", riderId).single();
+  const { data: rider } = await supabase
+    .from("riders")
+    .select("name, phone")
+    .eq("id", riderId)
+    .single();
   const { data: order } = await supabase
     .from("orders")
     .select("customer_phone")
     .eq("id", orderId)
     .single();
-  if (!rider || !order) return;
+  if (!rider || !order) return null;
 
   await performRiderAssignment(supabase, {
     orderId,
@@ -141,4 +148,6 @@ export async function runAutoAssignment(
     customerPhone: order.customer_phone,
     isReassignment: false,
   });
+
+  return { riderId, riderName: rider.name, riderPhone: rider.phone };
 }
