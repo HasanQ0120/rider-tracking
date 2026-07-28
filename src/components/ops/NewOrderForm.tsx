@@ -33,7 +33,18 @@ function Label({ children }: { children: React.ReactNode }) {
   return <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{children}</label>;
 }
 
-export function NewOrderForm() {
+export function NewOrderForm({
+  createEndpoint = "/api/ops/orders",
+  onCreated,
+  cancelHref = "/ops/orders",
+}: {
+  // Lets the merchant dashboard reuse this exact form/UI against its own
+  // tenant-scoped API route instead of the ops one -- defaults keep ops's
+  // existing behavior completely unchanged.
+  createEndpoint?: string;
+  onCreated?: (orderId: string) => void;
+  cancelHref?: string;
+} = {}) {
   const router = useRouter();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -122,7 +133,7 @@ export function NewOrderForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/ops/orders", {
+      const res = await fetch(createEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,7 +147,11 @@ export function NewOrderForm() {
       });
       const data = await res.json();
       if (data.order) {
-        router.push(`/ops/orders/${data.order.id}`);
+        if (onCreated) {
+          onCreated(data.order.id);
+        } else {
+          router.push(`/ops/orders/${data.order.id}`);
+        }
       } else if (data.status === "invalid_phone") {
         showPhoneError(PK_MOBILE_HINT);
       } else {
@@ -283,7 +298,7 @@ export function NewOrderForm() {
       </div>
 
       <div className="flex items-center justify-end gap-3">
-        <Link href="/ops/orders">
+        <Link href={cancelHref}>
           <Button variant="accent-outline">Cancel</Button>
         </Link>
         <Button onClick={submit} disabled={submitting || !selected}>

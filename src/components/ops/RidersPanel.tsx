@@ -19,7 +19,16 @@ type Rider = {
   activeCount?: number;
 };
 
-export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
+export function RidersPanel({
+  initialRiders,
+  createEndpoint = "/api/ops/riders",
+}: {
+  initialRiders: Rider[];
+  // Lets the merchant dashboard reuse this exact form/UI against its own
+  // tenant-scoped API route instead of the ops one -- default keeps ops's
+  // existing behavior completely unchanged.
+  createEndpoint?: string;
+}) {
   const [riders, setRiders] = useState(initialRiders);
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState("");
@@ -40,7 +49,7 @@ export function RidersPanel({ initialRiders }: { initialRiders: Rider[] }) {
       return;
     }
     setSubmitting(true);
-    const res = await fetch("/api/ops/riders", {
+    const res = await fetch(createEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
