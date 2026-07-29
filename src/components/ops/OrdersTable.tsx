@@ -32,13 +32,17 @@ const flagReasonLabels: Record<string, string> = {
 
 export function OrdersTable({
   orders,
-  orderHref = (id) => `/ops/orders/${id}`,
+  orderBasePath = "/ops/orders",
 }: {
   orders: OrderRow[];
   // Lets the merchant dashboard reuse this exact table against its own
   // order-detail route instead of ops's -- default keeps ops's existing
-  // behavior completely unchanged.
-  orderHref?: (id: string) => string;
+  // behavior completely unchanged. A plain string, not a function: a
+  // function prop from a Server Component (the pages rendering this) to
+  // this Client Component isn't serializable across that boundary and
+  // crashes the render (confirmed live -- "Functions cannot be passed
+  // directly to Client Components").
+  orderBasePath?: string;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -115,7 +119,7 @@ export function OrdersTable({
                   >
                     <td className="px-4 py-3">
                       <Link
-                        href={orderHref(o.id)}
+                        href={`${orderBasePath}/${o.id}`}
                         className="font-mono text-xs font-semibold text-brand-gold hover:underline"
                       >
                         {codeMap.get(o.id)}
@@ -125,7 +129,7 @@ export function OrdersTable({
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={orderHref(o.id)} className="font-medium text-white hover:underline">
+                      <Link href={`${orderBasePath}/${o.id}`} className="font-medium text-white hover:underline">
                         {o.customer_name}
                       </Link>
                       <p className="text-xs text-white/50">{o.customer_phone}</p>

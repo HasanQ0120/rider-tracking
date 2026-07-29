@@ -25,7 +25,7 @@ export default async function MerchantOrdersPage() {
           <Button>+ New Order</Button>
         </Link>
       </div>
-      <OrdersTable orders={orders ?? []} orderHref={(id) => `/merchant/orders/${id}`} />
+      <OrdersTable orders={orders ?? []} orderBasePath="/merchant/orders" />
     </div>
   );
 }
