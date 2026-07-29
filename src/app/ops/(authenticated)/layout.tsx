@@ -2,8 +2,16 @@ import Link from "next/link";
 import { OpsNav } from "@/components/ops/OpsNav";
 import { LogoutButton } from "@/components/ops/LogoutButton";
 import { Logo } from "@/components/ui/Logo";
+import { requireOpsUser } from "@/lib/ops/authGuard";
 
-export default function OpsLayout({ children }: { children: React.ReactNode }) {
+// Every ops page/route already independently calls requireOpsUser() or
+// requireOpsUserApi() (verified across the whole ops tree), so this call is
+// defense-in-depth, not a fix for a live hole -- but unlike the merchant
+// layout (which already guards centrally), this one previously enforced
+// nothing itself, leaving protection entirely dependent on every current
+// and future ops page remembering to add the check.
+export default async function OpsLayout({ children }: { children: React.ReactNode }) {
+  await requireOpsUser();
   return (
     <div className="min-h-screen bg-surface">
       <header className="flex items-center justify-between border-b border-white/10 bg-[#070a12] px-6 py-3 text-white shadow-sm">

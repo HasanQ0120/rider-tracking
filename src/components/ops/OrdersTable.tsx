@@ -30,7 +30,16 @@ const flagReasonLabels: Record<string, string> = {
   customer_rejected: "customer said not received",
 };
 
-export function OrdersTable({ orders }: { orders: OrderRow[] }) {
+export function OrdersTable({
+  orders,
+  orderHref = (id) => `/ops/orders/${id}`,
+}: {
+  orders: OrderRow[];
+  // Lets the merchant dashboard reuse this exact table against its own
+  // order-detail route instead of ops's -- default keeps ops's existing
+  // behavior completely unchanged.
+  orderHref?: (id: string) => string;
+}) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -106,7 +115,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                   >
                     <td className="px-4 py-3">
                       <Link
-                        href={`/ops/orders/${o.id}`}
+                        href={orderHref(o.id)}
                         className="font-mono text-xs font-semibold text-brand-gold hover:underline"
                       >
                         {codeMap.get(o.id)}
@@ -116,7 +125,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/ops/orders/${o.id}`} className="font-medium text-white hover:underline">
+                      <Link href={orderHref(o.id)} className="font-medium text-white hover:underline">
                         {o.customer_name}
                       </Link>
                       <p className="text-xs text-white/50">{o.customer_phone}</p>

@@ -77,11 +77,28 @@ export function OrderDetail({
   orderRank,
   tokens,
   riders,
+  assignEndpoint = `/api/ops/orders/${order.id}/assign`,
+  resetSessionEndpoint = `/api/ops/orders/${order.id}/reset-session`,
+  cancelEndpoint = `/api/ops/orders/${order.id}/cancel`,
+  backHref = "/ops/orders",
+  showCancelAction = true,
+  showResetSessionAction = true,
 }: {
   order: Order;
   orderRank: number;
   tokens: TokenRow[];
   riders: Rider[];
+  // Lets the merchant dashboard reuse this exact component against its own
+  // tenant-scoped API routes instead of ops's -- defaults keep ops's
+  // existing behavior completely unchanged. Cancel/reset-session stay
+  // ops-only for now (merchant only asked for rider assignment), gated
+  // off rather than pointed at endpoints that don't exist.
+  assignEndpoint?: string;
+  resetSessionEndpoint?: string;
+  cancelEndpoint?: string;
+  backHref?: string;
+  showCancelAction?: boolean;
+  showResetSessionAction?: boolean;
 }) {
   const router = useRouter();
   const [selectedRider, setSelectedRider] = useState(riders[0]?.id ?? "");
@@ -108,7 +125,7 @@ export function OrderDetail({
   async function assign(confirmReassign = false) {
     setBusyAction(confirmReassign ? "reassign" : "assign");
     setMessage(null);
-    const res = await fetch(`/api/ops/orders/${order.id}/assign`, {
+    const res = await fetch(assignEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ riderId: selectedRider, confirmReassign }),
@@ -131,7 +148,7 @@ export function OrderDetail({
 
   async function resetSession() {
     setBusyAction("reset");
-    const res = await fetch(`/api/ops/orders/${order.id}/reset-session`, { method: "POST" });
+    const res = await fetch(resetSessionEndpoint, { method: "POST" });
     const data = await res.json();
     setBusyAction(null);
     setMessage(data.status === "ok" ? "Session reset. Rider must re-enter PIN on new device." : `Failed: ${data.status}`);
@@ -139,7 +156,7 @@ export function OrderDetail({
 
   async function cancelOrder() {
     setBusyAction("cancel");
-    const res = await fetch(`/api/ops/orders/${order.id}/cancel`, { method: "POST" });
+    const res = await fetch(cancelEndpoint, { method: "POST" });
     if (res.ok) {
       router.refresh();
     } else {
@@ -160,7 +177,7 @@ export function OrderDetail({
     <div className="animate-slide-up space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href="/ops/orders"
+          href={backHref}
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Back to Orders"
         >
@@ -331,7 +348,7 @@ export function OrderDetail({
             </Card>
           )}
 
-          {activeRiderToken && (
+          {showResetSessionAction && activeRiderToken && (
             <Card title="Device Swap" className="animate-fade-in">
               <p className="mb-3 text-sm text-white/60">
                 Resets the rider&apos;s session and generates a new PIN. Use when the rider changes
@@ -344,7 +361,7 @@ export function OrderDetail({
             </Card>
           )}
 
-          {order.status !== "delivered" && order.status !== "cancelled" && (
+          {showCancelAction && order.status !== "delivered" && order.status !== "cancelled" && (
             <div className="rounded-xl border border-status-danger/30 bg-status-danger/5 p-5">
               <h2 className="mb-3 font-semibold text-status-danger">Cancel Order</h2>
               <button

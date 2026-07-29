@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CONNECTION_LOST_TIMEOUT_S } from "@/lib/config";
 
 // A rider's order is "in progress" for queue-ranking purposes in exactly
 // these statuses -- pending_confirmation/flagged_review deliberately excluded,
@@ -21,6 +22,22 @@ export async function getOrdersAhead(
   if (!order.assigned_rider_id || !ACTIVE_STATUSES.includes(order.status)) {
     return 0;
   }
+
+  // Real GPS evidence overrides formal assignment order: if the rider is
+  // currently sending location pings for THIS order right now, it's their
+  // effectively-current delivery no matter what assigned_at ranking says --
+  // e.g. an earlier order that got skipped/stuck without being formally
+  // closed out shouldn't leave a later, genuinely-in-progress order's
+  // customer stuck on the queue screen. Same staleness cutoff already used
+  // elsewhere for "is this rider still actively connected."
+  const staleCutoff = new Date(Date.now() - CONNECTION_LOST_TIMEOUT_S * 1000).toISOString();
+  const { data: ownLocation } = await supabase
+    .from("current_locations")
+    .select("recorded_at")
+    .eq("order_id", order.id)
+    .gt("recorded_at", staleCutoff)
+    .maybeSingle();
+  if (ownLocation) return 0;
 
   const { data: activeOrders } = await supabase
     .from("orders")
