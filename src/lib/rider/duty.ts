@@ -5,6 +5,7 @@ export type DutyRiderRow = {
   id: string;
   name: string;
   active: boolean;
+  tenant_id: string;
 };
 
 export async function loadRiderByDutyToken(
@@ -13,7 +14,7 @@ export async function loadRiderByDutyToken(
 ): Promise<DutyRiderRow | null> {
   const { data, error } = await supabase
     .from("riders")
-    .select("id, name, active")
+    .select("id, name, active, tenant_id")
     .eq("duty_token", dutyToken)
     .maybeSingle();
   if (error || !data) return null;

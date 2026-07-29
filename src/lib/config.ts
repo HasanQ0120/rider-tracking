@@ -66,6 +66,14 @@ export const DUTY_LOCATION_STALE_TIMEOUT_S = 120;
 // the 300-400m range confirmed with the merchant, using the midpoint.
 export const AUTO_ASSIGN_RADIUS_M = 350;
 
+// Default on-duty check-in geofence radius (meters) -- how close a rider
+// must be to the merchant's pickup point to successfully go on duty.
+// Overridable per-tenant via tenants.duty_checkin_radius_m (null there
+// means "use this default"); a mall location and a standalone building
+// reasonably want different tolerances, so this is a fallback, not a hard
+// global limit.
+export const DEFAULT_DUTY_CHECKIN_RADIUS_M = 300;
+
 // The single tenant that today's ops dashboard manages orders/riders for.
 // Ops has cross-tenant *visibility* (reads are never filtered), but until a
 // real tenant-switcher exists, ops-initiated writes (new order, new rider)

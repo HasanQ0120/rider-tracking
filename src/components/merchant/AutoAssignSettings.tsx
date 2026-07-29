@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { DEFAULT_DUTY_CHECKIN_RADIUS_M } from "@/lib/config";
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
 
@@ -21,17 +22,25 @@ export function AutoAssignSettings({
   initialPickupAddress,
   initialPickupLat,
   initialPickupLng,
+  initialCheckinRadiusM,
 }: {
   tenantId: string;
   initialAutoAssignEnabled: boolean;
   initialPickupAddress: string | null;
   initialPickupLat: number | null;
   initialPickupLng: number | null;
+  initialCheckinRadiusM: number | null;
 }) {
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(initialAutoAssignEnabled);
   const [pickupAddress, setPickupAddress] = useState(initialPickupAddress);
   const [pickupLat, setPickupLat] = useState(initialPickupLat);
   const [pickupLng, setPickupLng] = useState(initialPickupLng);
+  const [checkinRadiusM, setCheckinRadiusM] = useState(
+    initialCheckinRadiusM ?? DEFAULT_DUTY_CHECKIN_RADIUS_M
+  );
+  const [radiusInput, setRadiusInput] = useState(String(checkinRadiusM));
+  const [savingRadius, setSavingRadius] = useState(false);
+  const [radiusSaved, setRadiusSaved] = useState(false);
 
   const [addressQuery, setAddressQuery] = useState("");
   const [candidates, setCandidates] = useState<GeocodeResult[]>([]);
@@ -97,6 +106,33 @@ export function AutoAssignSettings({
       setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveCheckinRadius() {
+    const parsed = Number(radiusInput);
+    if (!Number.isFinite(parsed) || parsed < 50 || parsed > 2000) {
+      setError("Check-in radius must be between 50 and 2000 meters.");
+      return;
+    }
+    setSavingRadius(true);
+    setError(null);
+    try {
+      const supabase = createAuthBrowserClient();
+      const { error: updateError } = await supabase
+        .from("tenants")
+        .update({ duty_checkin_radius_m: parsed })
+        .eq("id", tenantId);
+      if (updateError) {
+        setError("Failed to save check-in radius.");
+        return;
+      }
+      setCheckinRadiusM(parsed);
+      setRadiusInput(String(parsed));
+      setRadiusSaved(true);
+      setTimeout(() => setRadiusSaved(false), 2000);
+    } finally {
+      setSavingRadius(false);
     }
   }
 
@@ -182,6 +218,41 @@ export function AutoAssignSettings({
               </Button>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card title="Rider Check-In">
+        <p className="mb-3 text-sm text-white/50">
+          How close a rider must be to your pickup location to go on duty. Falls back to the
+          platform default ({DEFAULT_DUTY_CHECKIN_RADIUS_M}m) until you set your own.
+        </p>
+        {!hasPickup && (
+          <p className="mb-3 text-xs text-white/40">
+            Set a pickup location above first — without one, riders can go on duty from anywhere.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type="number"
+              min={50}
+              max={2000}
+              value={radiusInput}
+              onChange={(e) => setRadiusInput(e.target.value)}
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-white/40">
+              m
+            </span>
+          </div>
+          <Button
+            variant="accent-outline"
+            onClick={saveCheckinRadius}
+            disabled={savingRadius || radiusInput === String(checkinRadiusM)}
+          >
+            {savingRadius && <Spinner className="h-4 w-4" />}
+            {savingRadius ? "Saving…" : radiusSaved ? "Saved!" : "Save"}
+          </Button>
         </div>
       </Card>
 
