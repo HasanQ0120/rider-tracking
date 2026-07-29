@@ -115,15 +115,11 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
         <details className="mt-4 text-sm text-white/50">
           <summary className="cursor-pointer text-white/70">How to use it</summary>
           <pre className="mt-2 overflow-x-auto rounded-lg bg-black/30 p-3 text-xs text-white/80">
-            {`curl -X POST ${endpoint} \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "customer_name": "Fatima Zahra",
-    "customer_phone": "03001234567",
-    "delivery_address": "House 12, Block 13-D2, Gulshan-e-Iqbal, Karachi"
-  }'`}
+            {`curl -X POST ${endpoint} -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d "{\\"customer_name\\": \\"Fatima Zahra\\", \\"customer_phone\\": \\"03001234567\\", \\"delivery_address\\": \\"House 12, Block 13-D2, Gulshan-e-Iqbal, Karachi\\"}"`}
           </pre>
+          <p className="mt-1 text-xs text-white/40">
+            One line, ready to paste directly into Command Prompt, PowerShell, or a terminal.
+          </p>
         </details>
       )}
 
