@@ -42,6 +42,7 @@ export function AutoAssignSettings({
   const [savingRadius, setSavingRadius] = useState(false);
   const [radiusSaved, setRadiusSaved] = useState(false);
 
+  const [changingPickup, setChangingPickup] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
   const [candidates, setCandidates] = useState<GeocodeResult[]>([]);
   const [selected, setSelected] = useState<GeocodeResult | null>(null);
@@ -53,6 +54,16 @@ export function AutoAssignSettings({
   const [togglingAutoAssign, setTogglingAutoAssign] = useState(false);
 
   const hasPickup = pickupLat != null && pickupLng != null;
+  const showPickupSearch = !hasPickup || changingPickup;
+
+  function cancelChangingPickup() {
+    setChangingPickup(false);
+    setAddressQuery("");
+    setCandidates([]);
+    setSelected(null);
+    setSearched(false);
+    setError(null);
+  }
 
   async function searchAddress() {
     if (!addressQuery.trim()) return;
@@ -102,6 +113,8 @@ export function AutoAssignSettings({
       setCandidates([]);
       setSelected(null);
       setAddressQuery("");
+      setSearched(false);
+      setChangingPickup(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -170,55 +183,69 @@ export function AutoAssignSettings({
           assignment.
         </p>
         {hasPickup && (
-          <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Current</p>
-            <p className="mt-1 text-sm text-white">{pickupAddress}</p>
-          </div>
-        )}
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search address…"
-              value={addressQuery}
-              onChange={(e) => setAddressQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-              className="flex-1"
-            />
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/40">
+                Current
+              </p>
+              <p className="mt-1 text-sm text-white">{pickupAddress}</p>
+            </div>
             <Button
               variant="accent-outline"
-              onClick={searchAddress}
-              disabled={searching || !addressQuery.trim()}
+              size="sm"
+              className="flex-shrink-0"
+              onClick={() => (changingPickup ? cancelChangingPickup() : setChangingPickup(true))}
             >
-              {searching && <Spinner className="h-4 w-4" />}
-              {searching ? "Searching…" : "Search"}
+              {changingPickup ? "Cancel" : "Change"}
             </Button>
           </div>
-
-          {searched && !searching && candidates.length === 0 && (
-            <StatusBanner tone="warning">No matching address found.</StatusBanner>
-          )}
-
-          {candidates.length > 0 && (
-            <div className="animate-fade-in space-y-2">
-              <Select
-                value={selected ? candidateKey(selected) : ""}
-                onChange={(e) =>
-                  setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
-                }
+        )}
+        {showPickupSearch && (
+          <div className="animate-fade-in space-y-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search address…"
+                value={addressQuery}
+                onChange={(e) => setAddressQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchAddress()}
+                className="flex-1"
+              />
+              <Button
+                variant="accent-outline"
+                onClick={searchAddress}
+                disabled={searching || !addressQuery.trim()}
               >
-                {candidates.map((c) => (
-                  <option key={candidateKey(c)} value={candidateKey(c)}>
-                    {c.placeName}
-                  </option>
-                ))}
-              </Select>
-              <Button onClick={savePickup} disabled={saving || !selected}>
-                {saving && <Spinner className="h-4 w-4" />}
-                {saving ? "Saving…" : saved ? "Saved!" : "Save Pickup Location"}
+                {searching && <Spinner className="h-4 w-4" />}
+                {searching ? "Searching…" : "Search"}
               </Button>
             </div>
-          )}
-        </div>
+
+            {searched && !searching && candidates.length === 0 && (
+              <StatusBanner tone="warning">No matching address found.</StatusBanner>
+            )}
+
+            {candidates.length > 0 && (
+              <div className="animate-fade-in space-y-2">
+                <Select
+                  value={selected ? candidateKey(selected) : ""}
+                  onChange={(e) =>
+                    setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
+                  }
+                >
+                  {candidates.map((c) => (
+                    <option key={candidateKey(c)} value={candidateKey(c)}>
+                      {c.placeName}
+                    </option>
+                  ))}
+                </Select>
+                <Button onClick={savePickup} disabled={saving || !selected}>
+                  {saving && <Spinner className="h-4 w-4" />}
+                  {saving ? "Saving…" : saved ? "Saved!" : "Save Pickup Location"}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card title="Rider Check-In">
