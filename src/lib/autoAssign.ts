@@ -148,7 +148,7 @@ export async function runAutoAssignment(
     .single();
   const { data: order } = await supabase
     .from("orders")
-    .select("customer_phone")
+    .select("customer_name, customer_phone")
     .eq("id", orderId)
     .single();
   if (!rider || !order) return null;
@@ -158,6 +158,7 @@ export async function runAutoAssignment(
     riderId,
     riderPhone: rider.phone,
     customerPhone: order.customer_phone,
+    customerName: order.customer_name,
     isReassignment: false,
   });
 

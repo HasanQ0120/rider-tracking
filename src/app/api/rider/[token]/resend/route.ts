@@ -36,8 +36,14 @@ export async function POST(
     .eq("id", riderToken.rider_id)
     .single();
 
+  const { data: order } = await supabase
+    .from("orders")
+    .select("customer_name")
+    .eq("id", riderToken.order_id)
+    .single();
+
   if (rider?.phone) {
-    await sendRiderLink(rider.phone, riderToken.token);
+    await sendRiderLink(rider.phone, riderToken.token, order?.customer_name ?? "your delivery");
   }
 
   await supabase

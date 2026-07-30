@@ -40,6 +40,7 @@ type OrderInfo = {
   delivery_lng: number | null;
   delivery_address: string;
   address_detail: string | null;
+  customer_name: string;
   customer_phone: string;
 };
 
@@ -342,6 +343,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
         <Card className="animate-slide-up">
+          <OrderIdentity order={order} />
           <ConsentLine />
           <h1 className="mt-5 text-lg font-semibold text-white">Enter your PIN</h1>
           <p className="mt-1 text-sm text-white/60">
@@ -381,6 +383,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6 text-center">
         <Card className="animate-scale-in">
+          <OrderIdentity order={order} />
           <ConsentLine />
           <Button className="mt-6 w-full" onClick={startTracking}>
             Start Sharing My Location
@@ -500,6 +503,24 @@ export function RiderTrackingClient({ token }: { token: string }) {
         onConfirm={tapDelivered}
         onCancel={() => setShowDeliveredConfirm(false)}
       />
+    </div>
+  );
+}
+
+// Shown before any action is taken (PIN entry, "ready" screen) -- not just
+// once tracking starts -- so a rider (or a tester) holding several links
+// issued close together for the same rider can tell which order this
+// specific link is for before doing anything with it. Using the wrong one
+// of several simultaneous links is what actually causes an order to look
+// like its link "expired on its own" when really its own completion/flag
+// path was correctly triggered by that same link.
+function OrderIdentity({ order }: { order: OrderInfo | null }) {
+  if (!order) return null;
+  return (
+    <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3 text-left">
+      <p className="text-xs font-semibold uppercase tracking-wide text-white/40">This link is for</p>
+      <p className="mt-1 font-medium text-white">{order.customer_name}</p>
+      <p className="text-sm text-white/60">{order.delivery_address}</p>
     </div>
   );
 }

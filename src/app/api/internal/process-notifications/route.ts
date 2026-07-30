@@ -16,17 +16,27 @@ export async function POST(req: Request) {
   const supabase = createServiceClient();
   const { data: pending } = await supabase
     .from("pending_notifications")
-    .select("id, to_phone, message")
+    .select("id, order_id, to_phone, message")
     .is("sent_at", null)
     .order("created_at", { ascending: true })
     .limit(50);
 
+  // Looked up separately rather than joined, to sidestep Supabase's
+  // object-vs-array return shape for a to-one join -- most batches only
+  // touch a handful of distinct orders anyway.
+  const orderIds = [...new Set((pending ?? []).map((r) => r.order_id))];
+  const { data: orders } = orderIds.length
+    ? await supabase.from("orders").select("id, customer_name").in("id", orderIds)
+    : { data: [] as { id: string; customer_name: string }[] };
+  const nameByOrderId = new Map((orders ?? []).map((o) => [o.id, o.customer_name]));
+
   let sent = 0;
   for (const row of pending ?? []) {
+    const customerName = nameByOrderId.get(row.order_id) ?? "your delivery";
     if (row.message.startsWith("link:")) {
-      await sendRiderLink(row.to_phone, row.message.slice("link:".length));
+      await sendRiderLink(row.to_phone, row.message.slice("link:".length), customerName);
     } else if (row.message.startsWith("pin:")) {
-      await sendRiderPin(row.to_phone, row.message.slice("pin:".length));
+      await sendRiderPin(row.to_phone, row.message.slice("pin:".length), customerName);
     }
     await supabase
       .from("pending_notifications")

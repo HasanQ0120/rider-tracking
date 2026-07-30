@@ -36,10 +36,11 @@ export async function performRiderAssignment(
     riderId: string;
     riderPhone: string;
     customerPhone: string | null;
+    customerName: string;
     isReassignment: boolean;
   }
 ): Promise<string | null> {
-  const { orderId, riderId, riderPhone, customerPhone, isReassignment } = params;
+  const { orderId, riderId, riderPhone, customerPhone, customerName, isReassignment } = params;
 
   const expiresAt = new Date(Date.now() + TOKEN_TIME_BUDGET_HOURS * 3_600_000).toISOString();
   const riderTokenStr = generateTrackingToken();
@@ -101,8 +102,8 @@ export async function performRiderAssignment(
   await supabase.from("orders").update(updatePayload).eq("id", orderId);
 
   await Promise.all([
-    sendRiderLink(riderPhone, riderTokenStr),
-    sendRiderPin(riderPhone, pin),
+    sendRiderLink(riderPhone, riderTokenStr, customerName),
+    sendRiderPin(riderPhone, pin, customerName),
     // Only sent on the very first assignment -- the customer token is
     // scoped to the order, not the rider, so reassignment never touches it.
     customerTokenStr && customerPhone

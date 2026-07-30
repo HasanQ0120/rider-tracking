@@ -21,17 +21,24 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
-export function sendRiderLink(phone: string, token: string) {
+// customerName is included specifically so a rider (or a tester) with
+// several links issued close together -- e.g. multiple orders assigned to
+// the same rider within a few minutes -- can tell them apart without
+// opening each one. Using the wrong one of several simultaneously-active
+// links has been the actual cause of "this link expired/never worked"
+// reports that turned out to be a correctly-scoped completion/flag on a
+// different order than the one someone thought they were acting on.
+export function sendRiderLink(phone: string, token: string, customerName: string) {
   return sendNotification(
     phone,
-    `You've been assigned a delivery. Track & share your location here: ${appUrl()}/rider/${token}`
+    `You've been assigned a delivery for ${customerName}. Track & share your location here: ${appUrl()}/rider/${token}`
   );
 }
 
-export function sendRiderPin(phone: string, pin: string) {
+export function sendRiderPin(phone: string, pin: string, customerName: string) {
   return sendNotification(
     phone,
-    `Your delivery tracking PIN is ${pin}. Enter it on the tracking page to start sharing your location.`
+    `Your delivery tracking PIN for ${customerName} is ${pin}. Enter it on the tracking page to start sharing your location.`
   );
 }
 

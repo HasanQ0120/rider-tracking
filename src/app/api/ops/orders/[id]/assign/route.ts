@@ -19,7 +19,7 @@ export async function POST(
   const supabase = createServiceClient();
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, assigned_rider_id, customer_phone")
+    .select("id, status, assigned_rider_id, customer_name, customer_phone")
     .eq("id", orderId)
     .single();
 
@@ -54,6 +54,7 @@ export async function POST(
       riderId,
       riderPhone: rider.phone,
       customerPhone: order.customer_phone,
+      customerName: order.customer_name,
       isReassignment,
     });
   } catch {
