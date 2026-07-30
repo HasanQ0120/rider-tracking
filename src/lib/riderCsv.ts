@@ -1,8 +1,8 @@
 import "server-only";
 import { parse } from "csv-parse/sync";
-import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
+import { validateRiderFields, type ParsedRider } from "@/lib/riderValidation";
 
-export type ParsedRider = { name: string; phone: string; license_plate: string };
+export type { ParsedRider };
 export type RowError = { line: number; reason: string };
 
 // Same three fields the manual "Add Rider" form requires, matching column
@@ -35,23 +35,12 @@ export function parseRiderCsv(csvText: string): { valid: ParsedRider[]; errors: 
 
   records.forEach((row, index) => {
     const line = index + 2;
-    const name = row.name?.trim();
-    const phone = row.phone?.trim();
-    const licensePlate = row.licenseplate?.trim();
-
-    if (!name) {
-      errors.push({ line, reason: "Missing name" });
+    const result = validateRiderFields({ name: row.name, phone: row.phone, license_plate: row.licenseplate });
+    if (!result.ok) {
+      errors.push({ line, reason: result.reason });
       return;
     }
-    if (!phone || !isValidPakistaniMobile(phone)) {
-      errors.push({ line, reason: `Missing or invalid phone -- ${PK_MOBILE_HINT}` });
-      return;
-    }
-    if (!licensePlate) {
-      errors.push({ line, reason: "Missing license plate" });
-      return;
-    }
-    valid.push({ name, phone: cleanPhoneInput(phone), license_plate: licensePlate });
+    valid.push(result.rider);
   });
 
   return { valid, errors };

@@ -1,6 +1,7 @@
 import { requireOpsUser } from "@/lib/ops/authGuard";
 import { createServiceClient } from "@/lib/supabase/service";
 import { OrderDetail } from "@/components/ops/OrderDetail";
+import { filterOnDutyRiderIds } from "@/lib/rider/onDuty";
 import { notFound } from "next/navigation";
 
 export default async function OrderDetailPage({
@@ -35,18 +36,24 @@ export default async function OrderDetailPage({
     .eq("order_id", id)
     .order("created_at", { ascending: false });
 
-  const { data: riders } = await supabase
+  const { data: activeRiders } = await supabase
     .from("riders")
     .select("id, name, phone")
     .eq("active", true)
     .order("name");
+
+  // Only riders who are actually on duty right now are assignable -- an
+  // "active" rider who's never checked in via their duty link shouldn't
+  // show up as a candidate at all, matching auto-assignment's own gate.
+  const onDutyIds = await filterOnDutyRiderIds(supabase, (activeRiders ?? []).map((r) => r.id));
+  const riders = (activeRiders ?? []).filter((r) => onDutyIds.has(r.id));
 
   return (
     <OrderDetail
       order={order}
       orderRank={orderRank ?? 1}
       tokens={tokens ?? []}
-      riders={riders ?? []}
+      riders={riders}
     />
   );
 }

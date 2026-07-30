@@ -8,11 +8,14 @@ const ACTIVE_STATUSES = ["assigned", "in_transit", "arrived"];
 
 type Position = { lat: number; lng: number; recordedAt: string };
 
-// Among a tenant's active riders, picks whichever is currently carrying
+// Among a tenant's on-duty riders, picks whichever is currently carrying
 // fewest active parcels among those within AUTO_ASSIGN_RADIUS_M of the
-// pickup point; if none are within radius, falls back to whichever active
+// pickup point; if none are within radius, falls back to whichever on-duty
 // rider is least busy overall, any distance. Returns null if the tenant has
-// no active riders (order is left pending, unassigned, exactly as today).
+// no active riders, or none of them are currently on duty (order is left
+// pending, unassigned, exactly as today) -- being "active" in the riders
+// table is not enough on its own; a rider must have actually checked in via
+// their duty link to be a candidate at all, in either pass.
 export async function findRiderForAutoAssignment(
   supabase: SupabaseClient,
   tenantId: string,
@@ -27,12 +30,26 @@ export async function findRiderForAutoAssignment(
   if (!riders || riders.length === 0) return null;
   const riderIds = riders.map((r) => r.id);
 
+  const staleCutoff = new Date(Date.now() - DUTY_LOCATION_STALE_TIMEOUT_S * 1000).toISOString();
+
+  // This is the on-duty set, not just a position lookup -- checked first so
+  // a tenant with active riders but nobody actually on duty short-circuits
+  // before the busy-count/live-location queries below even run.
+  const { data: dutyLocations } = await supabase
+    .from("rider_duty_locations")
+    .select("rider_id, lat, lng, recorded_at")
+    .in("rider_id", riderIds)
+    .gt("recorded_at", staleCutoff);
+
+  const onDutyRiderIds = new Set((dutyLocations ?? []).map((d) => d.rider_id));
+  if (onDutyRiderIds.size === 0) return null;
+
   const { data: activeOrders } = await supabase
     .from("orders")
     .select("id, assigned_rider_id")
     .eq("tenant_id", tenantId)
     .in("status", ACTIVE_STATUSES)
-    .in("assigned_rider_id", riderIds);
+    .in("assigned_rider_id", [...onDutyRiderIds]);
 
   const busyCount = new Map<string, number>();
   const orderIdToRider = new Map<string, string>();
@@ -41,14 +58,6 @@ export async function findRiderForAutoAssignment(
     busyCount.set(o.assigned_rider_id, (busyCount.get(o.assigned_rider_id) ?? 0) + 1);
     orderIdToRider.set(o.id, o.assigned_rider_id);
   }
-
-  const staleCutoff = new Date(Date.now() - DUTY_LOCATION_STALE_TIMEOUT_S * 1000).toISOString();
-
-  const { data: dutyLocations } = await supabase
-    .from("rider_duty_locations")
-    .select("rider_id, lat, lng, recorded_at")
-    .in("rider_id", riderIds)
-    .gt("recorded_at", staleCutoff);
 
   const orderIds = [...orderIdToRider.keys()];
   const { data: liveLocations } = orderIds.length
@@ -62,7 +71,9 @@ export async function findRiderForAutoAssignment(
   // A rider can have a fresh reading from more than one source (on-duty
   // ping, or a currently in-progress order's live tracking) -- take
   // whichever is freshest, matching the plan's "whichever is freshest
-  // between rider_duty_locations and current_locations" rule.
+  // between rider_duty_locations and current_locations" rule. This is only
+  // ever used to refine WHERE an on-duty rider is, never to make an
+  // off-duty rider eligible.
   const bestPosition = new Map<string, Position>();
   function considerPosition(riderId: string, lat: number, lng: number, recordedAt: string) {
     const existing = bestPosition.get(riderId);
@@ -73,11 +84,11 @@ export async function findRiderForAutoAssignment(
   for (const d of dutyLocations ?? []) considerPosition(d.rider_id, d.lat, d.lng, d.recorded_at);
   for (const l of liveLocations ?? []) {
     const riderId = orderIdToRider.get(l.order_id);
-    if (riderId) considerPosition(riderId, l.lat, l.lng, l.recorded_at);
+    if (riderId && onDutyRiderIds.has(riderId)) considerPosition(riderId, l.lat, l.lng, l.recorded_at);
   }
 
   let inRadius: { riderId: string; busy: number; distance: number } | null = null;
-  for (const riderId of riderIds) {
+  for (const riderId of onDutyRiderIds) {
     const pos = bestPosition.get(riderId);
     if (!pos) continue;
     const distance = haversineMeters(pickupLat, pickupLng, pos.lat, pos.lng);
@@ -89,10 +100,11 @@ export async function findRiderForAutoAssignment(
   }
   if (inRadius) return inRadius.riderId;
 
-  // No rider within radius (or no rider reporting a location at all) --
-  // fall back to whichever active rider is least busy overall.
+  // No on-duty rider within radius -- fall back to whichever on-duty rider
+  // is least busy overall. Off-duty riders are never candidates here,
+  // regardless of how idle they look on paper.
   let leastBusy: { riderId: string; busy: number } | null = null;
-  for (const riderId of riderIds) {
+  for (const riderId of onDutyRiderIds) {
     const busy = busyCount.get(riderId) ?? 0;
     if (!leastBusy || busy < leastBusy.busy) leastBusy = { riderId, busy };
   }
