@@ -301,6 +301,18 @@ export function CustomerTrackingClient({ token }: { token: string }) {
               Waiting for your rider to start sharing their location.
             </p>
           </div>
+        ) : markers.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-white/30">
+              <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth={1.6}>
+                <path d="M12 21s-7-6.5-7-11.5A7 7 0 0 1 19 9.5C19 14.5 12 21 12 21z" />
+                <circle cx="12" cy="9.5" r="2.2" />
+              </svg>
+            </div>
+            <p className="max-w-xs text-sm text-white/50">
+              Waiting for a delivery location to be set for this order.
+            </p>
+          </div>
         ) : (
           <TrackingMap
             markers={markers}
