@@ -65,13 +65,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }
   }
 
-  await supabase.from("rider_duty_locations").upsert({
+  const { error: upsertError } = await supabase.from("rider_duty_locations").upsert({
     rider_id: rider.id,
     lat,
     lng,
     recorded_at: now.toISOString(),
     session_id,
   });
+
+  if (upsertError) {
+    console.error("[duty/location] failed to write rider_duty_locations", upsertError);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
   return NextResponse.json({ status: "ok" });
 }

@@ -77,25 +77,6 @@ export function DutyClient({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const init = useCallback(async () => {
-    const { data } = await postJson(`/api/duty/${token}/init`, {});
-    switch (data.status) {
-      case "invalid":
-        setScreen("invalid");
-        break;
-      case "inactive":
-        setScreen("inactive");
-        break;
-      case "ok":
-        setRiderName(data.riderName);
-        sessionIdRef.current = data.sessionId;
-        setScreen("off_duty");
-        break;
-      default:
-        setScreen("invalid");
-    }
-  }, [token]);
-
   // Ongoing pings once already on duty -- the server only geofence-checks
   // a ping when there's no fresh existing session, so these routine
   // refreshes aren't re-gated on every tick, only a fresh check-in is.
@@ -160,6 +141,35 @@ export function DutyClient({ token }: { token: string }) {
     };
     intervalRef.current = setInterval(tick, DUTY_LOCATION_MIN_INTERVAL_MS + 2000);
   }, [sendLocation]);
+
+  const init = useCallback(async () => {
+    const { data } = await postJson(`/api/duty/${token}/init`, {});
+    switch (data.status) {
+      case "invalid":
+        setScreen("invalid");
+        break;
+      case "inactive":
+        setScreen("inactive");
+        break;
+      case "ok":
+        setRiderName(data.riderName);
+        sessionIdRef.current = data.sessionId;
+        if (data.onDuty) {
+          // A fresh rider_duty_locations row already exists (e.g. a mobile
+          // browser reloaded a backgrounded tab) -- resume the on-duty view
+          // and ping loop instead of blindly showing the check-in button
+          // again over a session that's still actually active.
+          setLastSentAt(data.recordedAt ? new Date(data.recordedAt) : null);
+          setScreen("on_duty");
+          startPingLoop();
+        } else {
+          setScreen("off_duty");
+        }
+        break;
+      default:
+        setScreen("invalid");
+    }
+  }, [token, startPingLoop]);
 
   // The check-in itself: the one attempt that's actually geofence-gated
   // server-side, deciding whether "on duty" is allowed to start at all.

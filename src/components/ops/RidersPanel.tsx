@@ -23,6 +23,7 @@ type Rider = {
   duty_token?: string;
   deliveredCount?: number;
   activeCount?: number;
+  onDuty?: boolean;
 };
 
 export function RidersPanel({
@@ -74,7 +75,7 @@ export function RidersPanel({
     const data = await res.json();
     setSubmitting(false);
     if (data.rider) {
-      setRiders([{ ...data.rider, deliveredCount: 0, activeCount: 0 }, ...riders]);
+      setRiders([{ ...data.rider, deliveredCount: 0, activeCount: 0, onDuty: false }, ...riders]);
       setName("");
       setPhone("");
       setLicensePlate("");
@@ -102,7 +103,7 @@ export function RidersPanel({
       }
       if (data.riders?.length) {
         setRiders([
-          ...data.riders.map((r: Rider) => ({ ...r, deliveredCount: 0, activeCount: 0 })),
+          ...data.riders.map((r: Rider) => ({ ...r, deliveredCount: 0, activeCount: 0, onDuty: false })),
           ...riders,
         ]);
       }
@@ -242,7 +243,17 @@ export function RidersPanel({
                   {r.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-medium text-white">{r.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-white">{r.name}</p>
+                    <span
+                      className={`inline-flex items-center gap-1 text-xs font-medium ${
+                        r.onDuty ? "text-status-success" : "text-white/30"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {r.onDuty ? "On duty" : "Off duty"}
+                    </span>
+                  </div>
                   <p className="text-xs text-white/50">
                     {r.phone}
                     {r.license_plate && (

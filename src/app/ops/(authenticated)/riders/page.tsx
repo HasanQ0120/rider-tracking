@@ -1,6 +1,7 @@
 import { requireOpsUser } from "@/lib/ops/authGuard";
 import { createServiceClient } from "@/lib/supabase/service";
 import { RidersPanel } from "@/components/ops/RidersPanel";
+import { filterOnDutyRiderIds } from "@/lib/rider/onDuty";
 
 export default async function RidersPage() {
   await requireOpsUser();
@@ -25,10 +26,13 @@ export default async function RidersPage() {
     counts.set(o.assigned_rider_id, entry);
   }
 
+  const onDutyIds = await filterOnDutyRiderIds(supabase, (riders ?? []).map((r) => r.id));
+
   const ridersWithCounts = (riders ?? []).map((r) => ({
     ...r,
     deliveredCount: counts.get(r.id)?.delivered ?? 0,
     activeCount: counts.get(r.id)?.active ?? 0,
+    onDuty: onDutyIds.has(r.id),
   }));
 
   return (

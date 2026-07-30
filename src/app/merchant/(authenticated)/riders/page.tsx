@@ -1,6 +1,8 @@
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
 import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { createServiceClient } from "@/lib/supabase/service";
 import { RidersPanel } from "@/components/ops/RidersPanel";
+import { filterOnDutyRiderIds } from "@/lib/rider/onDuty";
 
 export default async function MerchantRidersPage() {
   await requireMerchantUser();
@@ -21,10 +23,19 @@ export default async function MerchantRidersPage() {
     counts.set(o.assigned_rider_id, entry);
   }
 
+  // rider_duty_locations has no merchant RLS policy (service-role-only
+  // resource, same as tracking_tokens on the order-detail page) -- safe to
+  // read via service-role here specifically because the rider ids being
+  // checked came from the RLS-authenticated query above, which already
+  // proved they belong to this merchant's own tenant.
+  const service = createServiceClient();
+  const onDutyIds = await filterOnDutyRiderIds(service, (riders ?? []).map((r) => r.id));
+
   const ridersWithCounts = (riders ?? []).map((r) => ({
     ...r,
     deliveredCount: counts.get(r.id)?.delivered ?? 0,
     activeCount: counts.get(r.id)?.active ?? 0,
+    onDuty: onDutyIds.has(r.id),
   }));
 
   return (
