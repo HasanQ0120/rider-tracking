@@ -55,10 +55,14 @@ export async function POST(
     return NextResponse.json({ status: "not_arrived" }, { status: 403 });
   }
 
-  await supabase.rpc("mark_order_delivered", {
+  const { error } = await supabase.rpc("mark_order_delivered", {
     p_order_id: order.id,
     p_confirmed_by: "human",
   });
+  if (error) {
+    console.error("[customer/complete] mark_order_delivered failed", error);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
   return NextResponse.json({ status: "ok" });
 }

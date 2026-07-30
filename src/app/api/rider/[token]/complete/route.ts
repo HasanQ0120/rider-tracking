@@ -55,13 +55,21 @@ export async function POST(
     haversineMeters(order.delivery_lat, order.delivery_lng, loc.lat, loc.lng) <= PROXIMITY_RADIUS_M;
 
   if (withinRadius) {
-    await supabase.rpc("set_pending_confirmation", { p_order_id: order.id });
+    const { error } = await supabase.rpc("set_pending_confirmation", { p_order_id: order.id });
+    if (error) {
+      console.error("[rider/complete] set_pending_confirmation failed", error);
+      return NextResponse.json({ status: "error" }, { status: 500 });
+    }
     return NextResponse.json({ status: "pending_confirmation" });
   }
 
-  await supabase.rpc("flag_order_for_review", {
+  const { error } = await supabase.rpc("flag_order_for_review", {
     p_order_id: order.id,
     p_reason: "far_from_address",
   });
+  if (error) {
+    console.error("[rider/complete] flag_order_for_review failed", error);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
   return NextResponse.json({ status: "flagged", reason: "far_from_address" });
 }

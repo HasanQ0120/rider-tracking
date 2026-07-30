@@ -11,7 +11,11 @@ export async function POST(
   const { id: orderId } = await params;
 
   const supabase = createServiceClient();
-  await supabase.rpc("cancel_order", { p_order_id: orderId });
+  const { error } = await supabase.rpc("cancel_order", { p_order_id: orderId });
+  if (error) {
+    console.error("[ops/cancel] cancel_order failed", error);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
   return NextResponse.json({ status: "ok" });
 }

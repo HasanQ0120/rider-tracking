@@ -40,16 +40,24 @@ export async function POST(
   }
 
   if (response === "yes") {
-    await supabase.rpc("mark_order_delivered", {
+    const { error } = await supabase.rpc("mark_order_delivered", {
       p_order_id: order.id,
       p_confirmed_by: "customer_confirmed",
     });
+    if (error) {
+      console.error("[confirm-delivery] mark_order_delivered failed", error);
+      return NextResponse.json({ status: "error" }, { status: 500 });
+    }
     return NextResponse.json({ status: "ok", resolvedStatus: "delivered" });
   }
 
-  await supabase.rpc("flag_order_for_review", {
+  const { error } = await supabase.rpc("flag_order_for_review", {
     p_order_id: order.id,
     p_reason: "customer_rejected",
   });
+  if (error) {
+    console.error("[confirm-delivery] flag_order_for_review failed", error);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
   return NextResponse.json({ status: "ok", resolvedStatus: "flagged_review" });
 }
