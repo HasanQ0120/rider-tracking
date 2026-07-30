@@ -39,11 +39,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function tooFarMessage(distanceMeters?: number, radiusMeters?: number): string {
+function tooFarMessage(
+  distanceMeters?: number,
+  radiusMeters?: number,
+  pickupLocationName?: string | null
+): string {
+  const place = pickupLocationName || "the pickup location";
   if (distanceMeters != null && radiusMeters != null) {
-    return `You must be at the restaurant to go on duty. You're about ${distanceMeters}m away — you need to be within ${radiusMeters}m.`;
+    return `You must be at ${place} to go on duty. You're currently too far away — about ${distanceMeters}m, and you need to be within ${radiusMeters}m.`;
   }
-  return "You must be at the restaurant to go on duty.";
+  return `You must be at ${place} to go on duty. You're currently too far away.`;
 }
 
 // Bad first GPS fixes are common indoors/on a cold start -- worth a couple
@@ -122,7 +127,7 @@ export function DutyClient({ token }: { token: string }) {
             // ticking with nothing actually being recorded.
             if (intervalRef.current) clearInterval(intervalRef.current);
             setScreen("off_duty");
-            setCheckInError(tooFarMessage(data.distanceMeters, data.radiusMeters));
+            setCheckInError(tooFarMessage(data.distanceMeters, data.radiusMeters, data.pickupLocationName));
             break;
           case "inactive":
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -199,7 +204,7 @@ export function DutyClient({ token }: { token: string }) {
           return;
         case "too_far":
           setScreen("off_duty");
-          setCheckInError(tooFarMessage(data.distanceMeters, data.radiusMeters));
+          setCheckInError(tooFarMessage(data.distanceMeters, data.radiusMeters, data.pickupLocationName));
           return;
         case "inactive":
           setScreen("inactive");
@@ -216,7 +221,7 @@ export function DutyClient({ token }: { token: string }) {
 
     setScreen("off_duty");
     setCheckInError(
-      "Couldn't get an accurate enough GPS signal. Please try again outdoors or somewhere with a clearer sky view."
+      "We couldn't get an accurate location. Please move to an open area with a clear view of the sky and try again."
     );
   }, [token, startPingLoop]);
 

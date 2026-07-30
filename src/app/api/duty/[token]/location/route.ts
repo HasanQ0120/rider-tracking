@@ -53,6 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         status: "too_far",
         distanceMeters: geofence.distanceMeters,
         radiusMeters: geofence.radiusMeters,
+        pickupLocationName: geofence.pickupLocationName,
       });
     }
   }

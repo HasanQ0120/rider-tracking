@@ -5,7 +5,7 @@ import { DEFAULT_DUTY_CHECKIN_RADIUS_M } from "@/lib/config";
 
 export type GeofenceResult =
   | { ok: true }
-  | { ok: false; distanceMeters: number; radiusMeters: number };
+  | { ok: false; distanceMeters: number; radiusMeters: number; pickupLocationName: string | null };
 
 // Gates the check-in moment only (see callers) -- verifies a rider's
 // reported position is actually near the merchant's pickup point before
@@ -22,7 +22,7 @@ export async function checkDutyGeofence(
 ): Promise<GeofenceResult> {
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("default_pickup_lat, default_pickup_lng, duty_checkin_radius_m")
+    .select("default_pickup_lat, default_pickup_lng, duty_checkin_radius_m, default_pickup_address")
     .eq("id", tenantId)
     .single();
 
@@ -39,7 +39,12 @@ export async function checkDutyGeofence(
   );
 
   if (distanceMeters > radiusMeters) {
-    return { ok: false, distanceMeters: Math.round(distanceMeters), radiusMeters };
+    return {
+      ok: false,
+      distanceMeters: Math.round(distanceMeters),
+      radiusMeters,
+      pickupLocationName: tenant.default_pickup_address ?? null,
+    };
   }
   return { ok: true };
 }
