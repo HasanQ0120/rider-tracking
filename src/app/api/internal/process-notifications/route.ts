@@ -38,10 +38,17 @@ export async function POST(req: Request) {
     } else if (row.message.startsWith("pin:")) {
       await sendRiderPin(row.to_phone, row.message.slice("pin:".length), customerName);
     }
-    await supabase
+    const { error: markSentError } = await supabase
       .from("pending_notifications")
       .update({ sent_at: new Date().toISOString() })
       .eq("id", row.id);
+    if (markSentError) {
+      // Left with sent_at still null -- will be silently retried (a
+      // possible duplicate SMS) rather than lost, but log it so a
+      // persistently-stuck row is actually visible somewhere.
+      console.error("[process-notifications] failed to mark row sent", row.id, markSentError);
+      continue;
+    }
     sent += 1;
   }
 

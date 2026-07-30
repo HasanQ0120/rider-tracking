@@ -44,15 +44,18 @@ export async function POST(
 
   const correct = pinRow ? await verifyPin(pin, pinRow.pin_hash) : false;
 
-  await supabase.from("pin_attempts").insert({
+  const { error: attemptError } = await supabase.from("pin_attempts").insert({
     rider_token_id: riderToken.id,
     success: correct,
   });
+  if (attemptError) {
+    console.error("[verify-pin] failed to record pin_attempts", attemptError);
+  }
 
   if (!correct) {
     const nextFailCount = riderToken.pin_fail_count + 1;
     const lockingOut = nextFailCount >= PIN_MAX_ATTEMPTS;
-    await supabase
+    const { error: failCountError } = await supabase
       .from("tracking_tokens")
       .update({
         pin_fail_count: lockingOut ? 0 : nextFailCount,
@@ -61,6 +64,9 @@ export async function POST(
           : null,
       })
       .eq("id", riderToken.id);
+    if (failCountError) {
+      console.error("[verify-pin] failed to update pin_fail_count", failCountError);
+    }
 
     if (lockingOut) {
       return NextResponse.json({ status: "locked_out" }, { status: 423 });
@@ -71,26 +77,39 @@ export async function POST(
     );
   }
 
-  await supabase
+  const { error: resetFailCountError } = await supabase
     .from("tracking_tokens")
     .update({ pin_fail_count: 0, pin_locked_until: null })
     .eq("id", riderToken.id);
+  if (resetFailCountError) {
+    console.error("[verify-pin] failed to reset pin_fail_count", resetFailCountError);
+  }
 
   if (!lockedDeviceKey) {
-    await supabase
+    const { error: deviceLockError } = await supabase
       .from("device_locks")
       .insert({ rider_token_id: riderToken.id, device_key });
+    if (deviceLockError) {
+      console.error("[verify-pin] failed to write device_locks", deviceLockError);
+    }
   }
 
   const sessionId = generateSessionId();
-  await supabase
+  const { error: supersedeError } = await supabase
     .from("tracking_sessions")
     .update({ is_active: false, superseded_at: new Date().toISOString() })
     .eq("rider_token_id", riderToken.id)
     .eq("is_active", true);
-  await supabase
+  if (supersedeError) {
+    console.error("[verify-pin] failed to supersede previous session", supersedeError);
+  }
+  const { error: sessionInsertError } = await supabase
     .from("tracking_sessions")
     .insert({ rider_token_id: riderToken.id, session_id: sessionId });
+  if (sessionInsertError) {
+    console.error("[verify-pin] failed to create tracking session", sessionInsertError);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
   return NextResponse.json({ status: "active", sessionId });
 }

@@ -81,14 +81,20 @@ export async function performRiderAssignment(
   let customerTokenStr: string | null = null;
   if (!isReassignment) {
     customerTokenStr = generateTrackingToken();
-    await Promise.all([
+    const [pinCodesResult, customerTokenResult] = await Promise.all([
       pinCodesPromise,
       supabase
         .from("tracking_tokens")
         .insert({ token: customerTokenStr, order_id: orderId, type: "customer", expires_at: null }),
     ]);
+    if (pinCodesResult.error || customerTokenResult.error) {
+      throw new Error("Failed to create PIN or customer tracking token");
+    }
   } else {
-    await pinCodesPromise;
+    const { error: pinCodesError } = await pinCodesPromise;
+    if (pinCodesError) {
+      throw new Error("Failed to create PIN");
+    }
   }
 
   const updatePayload: Record<string, unknown> = {
@@ -99,7 +105,17 @@ export async function performRiderAssignment(
     assigned_at: new Date().toISOString(),
   };
   if (!isReassignment) updatePayload.status = "assigned";
-  await supabase.from("orders").update(updatePayload).eq("id", orderId);
+  // Checked (unlike the writes above it in this file historically were)
+  // because everything after this point -- the rider's real SMS link and
+  // PIN -- gets sent unconditionally next; never notify a rider of an
+  // assignment that wasn't actually persisted.
+  const { error: orderUpdateError } = await supabase
+    .from("orders")
+    .update(updatePayload)
+    .eq("id", orderId);
+  if (orderUpdateError) {
+    throw new Error("Failed to update order with assignment");
+  }
 
   await Promise.all([
     sendRiderLink(riderPhone, riderTokenStr, customerName),

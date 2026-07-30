@@ -98,7 +98,7 @@ export async function POST(
         : previous.heading ?? null;
   }
 
-  await supabase.from("current_locations").upsert({
+  const { error: upsertError } = await supabase.from("current_locations").upsert({
     order_id: order.id,
     lat,
     lng,
@@ -109,8 +109,12 @@ export async function POST(
     session_id,
     recorded_at: now.toISOString(),
   });
+  if (upsertError) {
+    console.error("[rider/location] failed to write current_locations", upsertError);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
-  await supabase.from("location_history").insert({
+  const { error: historyError } = await supabase.from("location_history").insert({
     order_id: order.id,
     lat,
     lng,
@@ -118,9 +122,18 @@ export async function POST(
     speed_kmh: speedKmh,
     recorded_at: now.toISOString(),
   });
+  if (historyError) {
+    console.error("[rider/location] failed to write location_history", historyError);
+  }
 
   if (order.status === "assigned") {
-    await supabase.from("orders").update({ status: "in_transit" }).eq("id", order.id);
+    const { error: statusError } = await supabase
+      .from("orders")
+      .update({ status: "in_transit" })
+      .eq("id", order.id);
+    if (statusError) {
+      console.error("[rider/location] failed to update order status to in_transit", statusError);
+    }
   }
 
   return NextResponse.json({ status: "ok", speedImplausible, heading, speedKmh });

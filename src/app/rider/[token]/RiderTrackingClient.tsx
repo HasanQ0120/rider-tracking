@@ -68,6 +68,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
   const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [autoResumeTracking, setAutoResumeTracking] = useState(false);
   const [arrivedBusy, setArrivedBusy] = useState(false);
   const [deliveredBusy, setDeliveredBusy] = useState(false);
   const [showDeliveredConfirm, setShowDeliveredConfirm] = useState(false);
@@ -94,38 +95,6 @@ export function RiderTrackingClient({ token }: { token: string }) {
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const init = useCallback(async () => {
-    const { data } = await postJson(`/api/rider/${token}/init`, {
-      device_key: deviceKeyRef.current,
-    });
-    if (data.order) setOrder(data.order);
-
-    switch (data.status) {
-      case "invalid":
-        setScreen("invalid");
-        break;
-      case "closed":
-        setScreen("completed");
-        break;
-      case "locked_out":
-        setLockedUntil(data.lockedUntil ?? null);
-        setScreen("locked_out");
-        break;
-      case "blocked_device":
-        setScreen("blocked_device");
-        break;
-      case "need_pin":
-        setScreen("pin");
-        break;
-      case "active":
-        setSessionId(data.sessionId);
-        setScreen("ready");
-        break;
-      default:
-        setScreen("invalid");
-    }
-  }, [token]);
 
   const submitPin = useCallback(async () => {
     if (pinSubmitting) return;
@@ -235,6 +204,56 @@ export function RiderTrackingClient({ token }: { token: string }) {
     tick();
     intervalRef.current = setInterval(tick, LOCATION_MIN_INTERVAL_MS + 2000);
   }, [sendLocation]);
+
+  const init = useCallback(async () => {
+    const { data } = await postJson(`/api/rider/${token}/init`, {
+      device_key: deviceKeyRef.current,
+    });
+    if (data.order) setOrder(data.order);
+
+    switch (data.status) {
+      case "invalid":
+        setScreen("invalid");
+        break;
+      case "closed":
+        setScreen("completed");
+        break;
+      case "locked_out":
+        setLockedUntil(data.lockedUntil ?? null);
+        setScreen("locked_out");
+        break;
+      case "blocked_device":
+        setScreen("blocked_device");
+        break;
+      case "need_pin":
+        setScreen("pin");
+        break;
+      case "active":
+        setSessionId(data.sessionId);
+        if (data.resuming) {
+          // Tracking is still genuinely live (e.g. a mobile tab reload) --
+          // jump straight back into it instead of showing "Start Sharing
+          // My Location" over a delivery that's already in progress.
+          // Deferred to the effect below rather than called directly here:
+          // sendLocation/startTracking close over `sessionId` state, which
+          // hasn't actually updated yet within this same synchronous call --
+          // calling startTracking() now would still see the pre-resume
+          // (null) sessionId and silently drop every location send.
+          setAutoResumeTracking(true);
+        } else {
+          setScreen("ready");
+        }
+        break;
+      default:
+        setScreen("invalid");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!autoResumeTracking) return;
+    setAutoResumeTracking(false);
+    startTracking();
+  }, [autoResumeTracking, startTracking]);
 
   useEffect(() => {
     return () => {

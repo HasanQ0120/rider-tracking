@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadActiveRiderToken, getDeviceLock } from "@/lib/rider/shared";
 import { generateSessionId } from "@/lib/tokens";
+import { CONNECTION_LOST_TIMEOUT_S } from "@/lib/config";
 
 export async function POST(
   req: Request,
@@ -46,18 +47,56 @@ export async function POST(
     return NextResponse.json({ status: "blocked_device" });
   }
 
+  // If tracking is still genuinely live (a position was reported recently),
+  // resume that same session instead of blindly superseding it -- otherwise
+  // a reloaded tab (mobile backgrounding, same trigger as the duty check-in
+  // bug) drops back to "Start Sharing My Location" over a delivery that's
+  // already in progress, and the customer's map goes stale in the meantime.
+  const { data: recentLocation } = await supabase
+    .from("current_locations")
+    .select("recorded_at")
+    .eq("order_id", order.id)
+    .maybeSingle();
+  const isLive =
+    !!recentLocation &&
+    Date.now() - new Date(recentLocation.recorded_at).getTime() < CONNECTION_LOST_TIMEOUT_S * 1000;
+
+  if (isLive) {
+    const { data: activeSession } = await supabase
+      .from("tracking_sessions")
+      .select("session_id")
+      .eq("rider_token_id", riderToken.id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (activeSession) {
+      return NextResponse.json({
+        status: "active",
+        sessionId: activeSession.session_id,
+        order,
+        resuming: true,
+      });
+    }
+  }
+
   // Same device reopening the link is always allowed and never needs the
   // PIN again -- mint a fresh session and supersede any prior one so a
   // stale tab elsewhere is told to stop on its next location send.
   const sessionId = generateSessionId();
-  await supabase
+  const { error: supersedeError } = await supabase
     .from("tracking_sessions")
     .update({ is_active: false, superseded_at: new Date().toISOString() })
     .eq("rider_token_id", riderToken.id)
     .eq("is_active", true);
-  await supabase
+  if (supersedeError) {
+    console.error("[rider/init] failed to supersede previous session", supersedeError);
+  }
+  const { error: insertError } = await supabase
     .from("tracking_sessions")
     .insert({ rider_token_id: riderToken.id, session_id: sessionId });
+  if (insertError) {
+    console.error("[rider/init] failed to create tracking session", insertError);
+    return NextResponse.json({ status: "error" }, { status: 500 });
+  }
 
   return NextResponse.json({ status: "active", sessionId, order });
 }
