@@ -50,29 +50,9 @@ export const ROUTE_REFETCH_MIN_INTERVAL_MS = 15000;
 // only affects how soon each page's own display catches up to that.
 export const CUSTOMER_POLL_INTERVAL_MS = 2000;
 
-// How often an on-duty (idle, between-deliveries) rider's page sends a
-// location ping. Coarser than per-order tracking's LOCATION_MIN_INTERVAL_MS
-// -- there's no live customer map depending on it, just staffing/assignment
-// decisions, so a slower cadence trades a little freshness for battery life.
-export const DUTY_LOCATION_MIN_INTERVAL_MS = 15000;
-
-// A duty-mode or in-progress-order location reading older than this doesn't
-// count as "the rider is there" for auto-assignment purposes -- matches the
-// spirit of CONNECTION_LOST_TIMEOUT_S but looser, since duty pings are sent
-// far less often than per-order ones.
-export const DUTY_LOCATION_STALE_TIMEOUT_S = 120;
-
 // Auto-assignment's "nearby" radius around a merchant's pickup point --
 // the 300-400m range confirmed with the merchant, using the midpoint.
 export const AUTO_ASSIGN_RADIUS_M = 350;
-
-// Default on-duty check-in geofence radius (meters) -- how close a rider
-// must be to the merchant's pickup point to successfully go on duty.
-// Overridable per-tenant via tenants.duty_checkin_radius_m (null there
-// means "use this default"); a mall location and a standalone building
-// reasonably want different tolerances, so this is a fallback, not a hard
-// global limit.
-export const DEFAULT_DUTY_CHECKIN_RADIUS_M = 300;
 
 // The single tenant that today's ops dashboard manages orders/riders for.
 // Ops has cross-tenant *visibility* (reads are never filtered), but until a

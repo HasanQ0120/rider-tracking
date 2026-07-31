@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
-import { generateDutyToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const guard = await requireMerchantUserApi();
@@ -22,7 +21,6 @@ export async function POST(req: Request) {
       name,
       phone: cleanPhoneInput(phone),
       license_plate,
-      duty_token: generateDutyToken(),
     })
     .select()
     .single();

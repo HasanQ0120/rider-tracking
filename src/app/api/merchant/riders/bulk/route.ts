@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
 import { parseRiderCsv } from "@/lib/riderCsv";
-import { generateDutyToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const guard = await requireMerchantUserApi();
@@ -28,7 +27,6 @@ export async function POST(req: Request) {
         name: r.name,
         phone: r.phone,
         license_plate: r.license_plate,
-        duty_token: generateDutyToken(),
       }))
     )
     .select();

@@ -10,13 +10,6 @@ export function generateSessionId(): string {
   return nanoid(24);
 }
 
-// Persistent per-rider "on duty" link -- unlike generateTrackingToken, this
-// one is never expected to expire or be revoked/reissued the way per-order
-// tokens are.
-export function generateDutyToken(): string {
-  return nanoid(28);
-}
-
 // A merchant's inbound-API credential. Prefixed so it's recognizable in
 // logs/support conversations without revealing the secret, and so the
 // server can narrow a lookup to one tenant (indexed api_key_prefix) before

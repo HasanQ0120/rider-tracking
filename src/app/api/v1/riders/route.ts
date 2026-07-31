@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
 import { validateRiderFields } from "@/lib/riderValidation";
-import { generateDutyToken } from "@/lib/tokens";
 
 // Same auth/rate-limit shape as /api/v1/orders -- a merchant's own backend
 // calls this directly to register/sync riders (e.g. their existing ~100-
@@ -64,9 +63,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "ok", imported: 0, riders: [], errors });
   }
 
-  // New riders are off duty by default with zero extra code -- they simply
-  // have no rider_duty_locations row until they check in via their own
-  // duty link, which is what "on duty" already means everywhere else.
   const { data, error } = await service
     .from("riders")
     .insert(
@@ -75,7 +71,6 @@ export async function POST(req: Request) {
         name: r.name,
         phone: r.phone,
         license_plate: r.license_plate,
-        duty_token: generateDutyToken(),
       }))
     )
     .select();

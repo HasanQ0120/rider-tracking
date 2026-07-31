@@ -1,14 +1,13 @@
 import { requireOpsUser } from "@/lib/ops/authGuard";
 import { createServiceClient } from "@/lib/supabase/service";
 import { RidersPanel } from "@/components/ops/RidersPanel";
-import { filterOnDutyRiderIds } from "@/lib/rider/onDuty";
 
 export default async function RidersPage() {
   await requireOpsUser();
   const supabase = createServiceClient();
   const { data: riders } = await supabase
     .from("riders")
-    .select("id, name, phone, license_plate, active, created_at, duty_token")
+    .select("id, name, phone, license_plate, active, created_at")
     .order("created_at", { ascending: false });
 
   // Additive read, display-only: the riders table has no delivery/active
@@ -26,13 +25,10 @@ export default async function RidersPage() {
     counts.set(o.assigned_rider_id, entry);
   }
 
-  const onDutyIds = await filterOnDutyRiderIds(supabase, (riders ?? []).map((r) => r.id));
-
   const ridersWithCounts = (riders ?? []).map((r) => ({
     ...r,
     deliveredCount: counts.get(r.id)?.delivered ?? 0,
     activeCount: counts.get(r.id)?.active ?? 0,
-    onDuty: onDutyIds.has(r.id),
   }));
 
   return (

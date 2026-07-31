@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
 import { getOpsHomeTenantId } from "@/lib/ops/homeTenant";
 import { parseRiderCsv } from "@/lib/riderCsv";
-import { generateDutyToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const guard = await requireOpsUserApi();
@@ -29,7 +28,6 @@ export async function POST(req: Request) {
         name: r.name,
         phone: r.phone,
         license_plate: r.license_plate,
-        duty_token: generateDutyToken(),
       }))
     )
     .select();

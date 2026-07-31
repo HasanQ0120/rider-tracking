@@ -9,7 +9,7 @@ export default async function MerchantSettingsPage() {
   const { data: tenant } = await supabase
     .from("tenants")
     .select(
-      "id, auto_assign_enabled, default_pickup_address, default_pickup_lat, default_pickup_lng, api_key_prefix, duty_checkin_radius_m"
+      "id, auto_assign_enabled, default_pickup_address, default_pickup_lat, default_pickup_lng, api_key_prefix"
     )
     .eq("id", merchant.tenantId)
     .single();
@@ -23,7 +23,6 @@ export default async function MerchantSettingsPage() {
         initialPickupAddress={tenant?.default_pickup_address ?? null}
         initialPickupLat={tenant?.default_pickup_lat ?? null}
         initialPickupLng={tenant?.default_pickup_lng ?? null}
-        initialCheckinRadiusM={tenant?.duty_checkin_radius_m ?? null}
       />
       <ApiKeySettings initialPrefix={tenant?.api_key_prefix ?? null} />
     </div>
