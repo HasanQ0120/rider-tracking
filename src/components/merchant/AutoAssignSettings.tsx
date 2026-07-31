@@ -7,8 +7,14 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { TrackingMap } from "@/components/map/TrackingMap";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
 import { DEFAULT_DUTY_CHECKIN_RADIUS_M } from "@/lib/config";
+
+// Fallback starting viewport before any address has been searched or
+// clicked, matching the same constant used for the same reason in
+// NewOrderForm.tsx.
+const DEFAULT_MAP_CENTER: [number, number] = [24.9204, 67.0946];
 
 type GeocodeResult = { placeName: string; lat: number; lng: number };
 
@@ -87,6 +93,24 @@ export function AutoAssignSettings({
       setSearching(false);
       setSearched(true);
     }
+  }
+
+  // Dragging fine-tunes an existing pin by a few meters -- keep whatever
+  // label it already had (search result text), only the coordinates move.
+  function handlePinDrag(_id: string, lat: number, lng: number) {
+    setSelected((prev) => (prev ? { ...prev, lat, lng } : prev));
+  }
+
+  // A map click can jump anywhere, bypassing search entirely -- treat it as
+  // a fresh manual placement. This is what actually fixes a wrong/ambiguous
+  // geocode match (e.g. a business-name search landing on the wrong branch)
+  // instead of just re-searching and hoping for a different top result.
+  function handleMapClick(lat: number, lng: number) {
+    setSelected({
+      placeName: addressQuery.trim() || `Custom location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+      lat,
+      lng,
+    });
   }
 
   async function savePickup() {
@@ -194,7 +218,19 @@ export function AutoAssignSettings({
               variant="accent-outline"
               size="sm"
               className="flex-shrink-0"
-              onClick={() => (changingPickup ? cancelChangingPickup() : setChangingPickup(true))}
+              onClick={() => {
+                if (changingPickup) {
+                  cancelChangingPickup();
+                  return;
+                }
+                // Pre-populate the map with the existing pin so it's
+                // immediately visible and draggable, instead of starting
+                // from a blank map that only fills in after a fresh search.
+                if (pickupLat != null && pickupLng != null) {
+                  setSelected({ placeName: pickupAddress ?? "", lat: pickupLat, lng: pickupLng });
+                }
+                setChangingPickup(true);
+              }}
             >
               {changingPickup ? "Cancel" : "Change"}
             </Button>
@@ -224,24 +260,49 @@ export function AutoAssignSettings({
               <StatusBanner tone="warning">No matching address found.</StatusBanner>
             )}
 
-            {candidates.length > 0 && (
-              <div className="animate-fade-in space-y-2">
-                <Select
-                  value={selected ? candidateKey(selected) : ""}
-                  onChange={(e) =>
-                    setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
-                  }
-                >
-                  {candidates.map((c) => (
-                    <option key={candidateKey(c)} value={candidateKey(c)}>
-                      {c.placeName}
-                    </option>
-                  ))}
-                </Select>
-                <Button onClick={savePickup} disabled={saving || !selected}>
+            {candidates.length > 1 && (
+              <Select
+                value={selected ? candidateKey(selected) : ""}
+                onChange={(e) =>
+                  setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
+                }
+              >
+                {candidates.map((c) => (
+                  <option key={candidateKey(c)} value={candidateKey(c)}>
+                    {c.placeName}
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            {selected && (
+              <div className="space-y-2">
+                <div className="h-64 overflow-hidden rounded-xl border border-white/10 shadow-sm">
+                  <TrackingMap
+                    markers={[{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#FFD700", draggable: true }]}
+                    defaultCenter={[selected.lat, selected.lng]}
+                    onMapClick={handleMapClick}
+                    onMarkerDrag={handlePinDrag}
+                  />
+                </div>
+                <p className="text-xs text-white/40">
+                  📍 {selected.lat.toFixed(6)}, {selected.lng.toFixed(6)} — click the map or drag the
+                  pin if this isn't the exact spot.
+                </p>
+                <Button onClick={savePickup} disabled={saving}>
                   {saving && <Spinner className="h-4 w-4" />}
                   {saving ? "Saving…" : saved ? "Saved!" : "Save Pickup Location"}
                 </Button>
+              </div>
+            )}
+
+            {!selected && (
+              <div className="h-64 overflow-hidden rounded-xl border border-white/10 shadow-sm">
+                <TrackingMap
+                  markers={[]}
+                  defaultCenter={DEFAULT_MAP_CENTER}
+                  onMapClick={handleMapClick}
+                />
               </div>
             )}
           </div>
