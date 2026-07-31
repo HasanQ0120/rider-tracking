@@ -1,0 +1,11 @@
+-- The rider PIN is otherwise never persisted anywhere (pin_hash is a bcrypt
+-- hash, one-way) -- ops/merchant currently have no way to see it again after
+-- the one-time assign-response toast, which is especially broken for
+-- auto-assigned orders where nobody ever saw that toast at all. pin_plain is
+-- populated app-side only while the notify provider is still the console
+-- test stub (see isTestNotificationProvider in src/lib/notify/index.ts) --
+-- same reasoning as that flag itself: nothing is actually being kept
+-- confidential yet since no real SMS is sent. Once a real provider is wired
+-- in, this column simply stops being written and the UI field disappears on
+-- its own -- no future migration needed to lock it back down.
+alter table pin_codes add column pin_plain text;

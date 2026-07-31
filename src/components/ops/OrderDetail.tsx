@@ -77,6 +77,7 @@ export function OrderDetail({
   orderRank,
   tokens,
   riders,
+  pin = null,
   assignEndpoint = `/api/ops/orders/${order.id}/assign`,
   resetSessionEndpoint = `/api/ops/orders/${order.id}/reset-session`,
   cancelEndpoint = `/api/ops/orders/${order.id}/cancel`,
@@ -88,6 +89,11 @@ export function OrderDetail({
   orderRank: number;
   tokens: TokenRow[];
   riders: Rider[];
+  // Persistent PIN read back from the DB (pin_codes.pin_plain) for the
+  // order's active rider token, if any -- only ever non-null while no real
+  // SMS provider is connected. Covers auto-assigned orders (which never
+  // trigger the assign-response toast below at all) and surviving a reload.
+  pin?: string | null;
   // Lets the merchant dashboard reuse this exact component against its own
   // tenant-scoped API routes instead of ops's -- defaults keep ops's
   // existing behavior completely unchanged. Cancel/reset-session stay
@@ -110,11 +116,12 @@ export function OrderDetail({
     null
   );
   const [message, setMessage] = useState<string | null>(null);
-  // Only ever set from the assign response's own `pin` field, which the API
-  // itself only includes while the notification provider is still the
-  // console-log test stub -- this just gives that already-gated value a
-  // more visible home (next to the rider link) instead of a one-time toast.
+  // Shows the freshly-assigned PIN immediately, before the router.refresh()
+  // below round-trips back with the same value via the persistent `pin`
+  // prop -- falls back to that prop otherwise (a reload, or an
+  // auto-assigned order this component never called assign() for at all).
   const [assignedPin, setAssignedPin] = useState<string | null>(null);
+  const displayedPin = assignedPin ?? pin;
   const [copied, setCopied] = useState<"rider" | "customer" | null>(null);
   const busy = busyAction !== null;
 
@@ -306,8 +313,8 @@ export function OrderDetail({
                     <div className="flex items-center gap-2">
                       <p className="min-w-0 flex-1 truncate text-sm text-white/70">
                         Rider Link
-                        {assignedPin && (
-                          <span className="ml-2 font-mono text-xs text-brand-gold">PIN: {assignedPin}</span>
+                        {displayedPin && (
+                          <span className="ml-2 font-mono text-xs text-brand-gold">PIN: {displayedPin}</span>
                         )}
                       </p>
                       <a href={`/rider/${activeRiderToken.token}`} target="_blank" rel="noopener noreferrer">

@@ -36,6 +36,19 @@ export default async function OrderDetailPage({
     .eq("order_id", id)
     .order("created_at", { ascending: false });
 
+  // Only ever non-null while no real SMS provider is connected (see
+  // pin_plain / isTestNotificationProvider in src/lib/assignRider.ts) --
+  // gives ops a persistent way to see the PIN instead of the one-time
+  // assign-response toast, which auto-assigned orders never showed at all.
+  const activeRiderTokenId = tokens?.find((t) => t.type === "rider" && t.active)?.id;
+  const { data: pinCode } = activeRiderTokenId
+    ? await supabase
+        .from("pin_codes")
+        .select("pin_plain")
+        .eq("rider_token_id", activeRiderTokenId)
+        .maybeSingle()
+    : { data: null };
+
   const { data: activeRiders } = await supabase
     .from("riders")
     .select("id, name, phone")
@@ -54,6 +67,7 @@ export default async function OrderDetailPage({
       orderRank={orderRank ?? 1}
       tokens={tokens ?? []}
       riders={riders}
+      pin={pinCode?.pin_plain ?? null}
     />
   );
 }

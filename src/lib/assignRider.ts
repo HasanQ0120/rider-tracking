@@ -74,9 +74,18 @@ export async function performRiderAssignment(
 
   const pinHash = await hashPromise;
 
-  const pinCodesPromise = supabase
-    .from("pin_codes")
-    .insert({ rider_token_id: newRiderToken.id, order_id: orderId, pin_hash: pinHash });
+  const pinCodesPromise = supabase.from("pin_codes").insert({
+    rider_token_id: newRiderToken.id,
+    order_id: orderId,
+    pin_hash: pinHash,
+    // Only ever populated while no real SMS provider is connected (see the
+    // isTestNotificationProvider return below) -- lets ops/merchant see the
+    // PIN persistently in the UI during testing, including for auto-assigned
+    // orders nobody ever saw the one-time assign toast for. Stays null the
+    // moment a real provider is wired in, so nothing genuinely confidential
+    // ever gets stored.
+    pin_plain: isTestNotificationProvider ? pin : null,
+  });
 
   let customerTokenStr: string | null = null;
   if (!isReassignment) {

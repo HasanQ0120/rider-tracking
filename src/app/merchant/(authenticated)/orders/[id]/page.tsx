@@ -51,6 +51,20 @@ export default async function MerchantOrderDetailPage({
     .eq("order_id", id)
     .order("created_at", { ascending: false });
 
+  // Only ever non-null while no real SMS provider is connected (see
+  // pin_plain / isTestNotificationProvider in src/lib/assignRider.ts) --
+  // gives the merchant a persistent way to see the PIN instead of the
+  // one-time assign-response toast, which auto-assigned orders never
+  // showed at all.
+  const activeRiderTokenId = tokens?.find((t) => t.type === "rider" && t.active)?.id;
+  const { data: pinCode } = activeRiderTokenId
+    ? await service
+        .from("pin_codes")
+        .select("pin_plain")
+        .eq("rider_token_id", activeRiderTokenId)
+        .maybeSingle()
+    : { data: null };
+
   // Only riders who are actually on duty right now are assignable -- an
   // "active" rider who's never checked in via their duty link shouldn't
   // show up as a candidate at all, matching auto-assignment's own gate.
@@ -63,6 +77,7 @@ export default async function MerchantOrderDetailPage({
       orderRank={orderRank ?? 1}
       tokens={tokens ?? []}
       riders={riders}
+      pin={pinCode?.pin_plain ?? null}
       assignEndpoint={`/api/merchant/orders/${id}/assign`}
       backHref="/merchant"
       showCancelAction={false}
