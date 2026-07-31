@@ -47,7 +47,7 @@ type Loc = {
 };
 
 export function CustomerTrackingClient({ token }: { token: string }) {
-  const [screen, setScreen] = useState<"loading" | "invalid" | "live">("loading");
+  const [screen, setScreen] = useState<"loading" | "invalid" | "error" | "live">("loading");
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [rider, setRider] = useState<Rider>(null);
   const [loc, setLoc] = useState<Loc | null>(null);
@@ -72,19 +72,43 @@ export function CustomerTrackingClient({ token }: { token: string }) {
     if (data.loc) setLoc(data.loc);
   }, [token]);
 
-  useEffect(() => {
-    (async () => {
+  const init = useCallback(async (attempt = 0) => {
+    let data: Record<string, unknown> | null = null;
+    try {
       const res = await fetch(`/api/customer/${token}/init`, { method: "POST" });
-      const data = await res.json();
-      if (data.status !== "ok") {
-        setScreen("invalid");
-        return;
-      }
-      setOrder(data.order);
-      setRider(data.rider);
+      data = await res.json();
+    } catch {
+      // Fetch itself failed, or the response wasn't JSON -- a transient
+      // hiccup (network blip, cold serverless start), not necessarily a
+      // dead token. Left as null below so it's treated the same as an
+      // unrecognized status: retry once before giving up.
+    }
+
+    if (data?.status === "ok") {
+      setOrder(data.order as OrderInfo);
+      setRider(data.rider as Rider);
       setScreen("live");
       await poll();
-    })();
+      return;
+    }
+
+    if (data?.status === "invalid") {
+      setScreen("invalid");
+      return;
+    }
+
+    // Anything else -- a fetch/parse failure, or an unexpected status --
+    // is treated as a transient request failure, not a dead token. Retry
+    // once before giving up.
+    if (attempt === 0) {
+      setTimeout(() => void init(1), 1500);
+    } else {
+      setScreen("error");
+    }
+  }, [token, poll]);
+
+  useEffect(() => {
+    void init();
 
     // Plain polling through our own service-role-backed API rather than a
     // direct Supabase Realtime subscription -- see /api/customer/[token]/poll
@@ -168,6 +192,22 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   if (screen === "loading") return <CenteredMessage>Loading…</CenteredMessage>;
   if (screen === "invalid") {
     return <CenteredMessage>This tracking link is invalid.</CenteredMessage>;
+  }
+  if (screen === "error") {
+    return (
+      <CenteredMessage>
+        <p>Couldn&apos;t load your tracking link. Check your connection and try again.</p>
+        <Button
+          className="mt-4 w-full"
+          onClick={() => {
+            setScreen("loading");
+            void init();
+          }}
+        >
+          Retry
+        </Button>
+      </CenteredMessage>
+    );
   }
   if (!order) return <CenteredMessage>Loading…</CenteredMessage>;
 

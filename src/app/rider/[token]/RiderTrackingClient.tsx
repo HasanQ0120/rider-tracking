@@ -22,6 +22,7 @@ import {
 type Screen =
   | "loading"
   | "invalid"
+  | "error"
   | "closed"
   | "locked_out"
   | "blocked_device"
@@ -44,13 +45,23 @@ type OrderInfo = {
   customer_phone: string;
 };
 
-async function postJson(url: string, body: unknown) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return { res, data: await res.json().catch(() => ({})) };
+// res is null specifically when the request itself never completed (a
+// network-level failure, not an HTTP error response) -- callers that only
+// look at `data.status` are unaffected either way (data is {} in both
+// that case and a non-JSON response), but anything reading `res.status`
+// needs to guard against null.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function postJson(url: string, body: unknown): Promise<{ res: Response | null; data: any }> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return { res, data: await res.json().catch(() => ({})) };
+  } catch {
+    return { res: null, data: {} };
+  }
 }
 
 export function RiderTrackingClient({ token }: { token: string }) {
@@ -112,7 +123,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
         setScreen("locked_out");
       } else if (data.status === "blocked_device") {
         setScreen("blocked_device");
-      } else if (res.status === 401) {
+      } else if (res?.status === 401) {
         setPinError(
           data.attemptsRemaining != null
             ? `Incorrect PIN. ${data.attemptsRemaining} attempt(s) remaining.`
@@ -205,7 +216,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
     intervalRef.current = setInterval(tick, LOCATION_MIN_INTERVAL_MS + 2000);
   }, [sendLocation]);
 
-  const init = useCallback(async () => {
+  const init = useCallback(async (attempt = 0) => {
     const { data } = await postJson(`/api/rider/${token}/init`, {
       device_key: deviceKeyRef.current,
     });
@@ -245,7 +256,18 @@ export function RiderTrackingClient({ token }: { token: string }) {
         }
         break;
       default:
-        setScreen("invalid");
+        // An unrecognized/missing status means the request itself failed
+        // (network hiccup, a cold serverless start returning a 502/504
+        // gateway page, anything non-JSON) -- not necessarily that the
+        // token is genuinely dead. Retry once before concluding that;
+        // jumping straight to "invalid" on the very first transient
+        // hiccup is exactly what produced "link expired" reports that a
+        // plain resend-and-reopen (i.e. just trying again) always fixed.
+        if (attempt === 0) {
+          setTimeout(() => void init(1), 1500);
+        } else {
+          setScreen("error");
+        }
     }
   }, [token]);
 
@@ -295,7 +317,7 @@ export function RiderTrackingClient({ token }: { token: string }) {
   const requestResend = useCallback(async () => {
     setResendState("sending");
     const { res } = await postJson(`/api/rider/${token}/resend`, {});
-    setResendState(res.status === 429 ? "limited" : "sent");
+    setResendState(res?.status === 429 ? "limited" : "sent");
   }, [token]);
 
   if (screen === "loading") {
@@ -303,6 +325,22 @@ export function RiderTrackingClient({ token }: { token: string }) {
   }
   if (screen === "invalid") {
     return <CenteredMessage>This tracking link is invalid or has expired.</CenteredMessage>;
+  }
+  if (screen === "error") {
+    return (
+      <CenteredMessage>
+        <p>Couldn&apos;t load your tracking link. Check your connection and try again.</p>
+        <Button
+          className="mt-4 w-full"
+          onClick={() => {
+            setScreen("loading");
+            void init();
+          }}
+        >
+          Retry
+        </Button>
+      </CenteredMessage>
+    );
   }
   if (screen === "completed") {
     return <CenteredMessage>This delivery has been completed. Thank you!</CenteredMessage>;
