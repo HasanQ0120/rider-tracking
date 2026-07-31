@@ -309,6 +309,14 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       : null;
   const etaMinutes = etaSeconds != null ? Math.max(1, Math.round(etaSeconds / 60)) : null;
   const isRiderAssigned = Boolean(order.assigned_rider_id);
+  // Checked ahead of waitingForLocation below and independent of it -- an
+  // order created without delivery coordinates (e.g. the v1 inbound API,
+  // where they're optional) has nothing to route to no matter what the
+  // rider is doing. Without this taking priority, the moment the rider's
+  // first ping arrives `markers` already has an entry (the rider's own
+  // dot) and this placeholder could never fire at all -- the customer
+  // would just get a destination-less map forever with no indication why.
+  const hasDeliveryLocation = order.delivery_lat != null && order.delivery_lng != null;
   // A rider is assigned but hasn't sent a location yet (link not opened,
   // permission not granted, or no GPS fix yet) -- a bare map with nothing
   // but the destination pin reads as broken, not "in progress." Resolves
@@ -318,7 +326,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   // assigned" only -- before that, the existing "Rider not yet assigned"
   // bottom banner already covers it, so the map there is left as-is. The
   // queue message always wins over this for a queued order.
-  const waitingForLocation = !isQueued && Boolean(rider) && !loc;
+  const waitingForLocation = !isQueued && hasDeliveryLocation && Boolean(rider) && !loc;
   const queueMessage = (() => {
     const n = order.orders_ahead ?? 0;
     return `Your rider has picked up your order. He's currently completing ${n} other ${
@@ -329,19 +337,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   return (
     <div className="relative h-screen overflow-hidden bg-surface">
       <div className="absolute inset-0">
-        {waitingForLocation ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-white/30">
-              <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth={1.6}>
-                <path d="M9 4l-5 2v14l5-2 6 2 5-2V4l-5 2-6-2z" />
-                <path d="M9 4v14M15 6v14" />
-              </svg>
-            </div>
-            <p className="max-w-xs text-sm text-white/50">
-              Waiting for your rider to start sharing their location.
-            </p>
-          </div>
-        ) : markers.length === 0 ? (
+        {!hasDeliveryLocation ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-white/30">
               <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth={1.6}>
@@ -351,6 +347,18 @@ export function CustomerTrackingClient({ token }: { token: string }) {
             </div>
             <p className="max-w-xs text-sm text-white/50">
               Waiting for a delivery location to be set for this order.
+            </p>
+          </div>
+        ) : waitingForLocation ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-white/30">
+              <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth={1.6}>
+                <path d="M9 4l-5 2v14l5-2 6 2 5-2V4l-5 2-6-2z" />
+                <path d="M9 4v14M15 6v14" />
+              </svg>
+            </div>
+            <p className="max-w-xs text-sm text-white/50">
+              Waiting for your rider to start sharing their location.
             </p>
           </div>
         ) : (
