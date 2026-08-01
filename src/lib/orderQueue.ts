@@ -48,6 +48,24 @@ export async function getOrdersAhead(
     .order("id", { ascending: true });
 
   if (!activeOrders) return 0;
+
+  // Same GPS-evidence override, applied to siblings: if the rider skipped
+  // this order and is instead actively pinging a *different* one of their
+  // active orders, that's the real number of deliveries in the way right
+  // now -- not this order's assigned_at rank, which would otherwise still
+  // count already-resolved or never-started siblings as "ahead" (or, once
+  // an earlier sibling is delivered, wrongly rank this order as "current"
+  // just because it was assigned first).
+  const otherIds = activeOrders.map((o) => o.id).filter((id) => id !== order.id);
+  if (otherIds.length > 0) {
+    const { data: liveOthers } = await supabase
+      .from("current_locations")
+      .select("order_id")
+      .in("order_id", otherIds)
+      .gt("recorded_at", staleCutoff);
+    if (liveOthers && liveOthers.length > 0) return liveOthers.length;
+  }
+
   const index = activeOrders.findIndex((o) => o.id === order.id);
   return index < 0 ? 0 : index;
 }
