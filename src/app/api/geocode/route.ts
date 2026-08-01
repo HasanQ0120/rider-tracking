@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { geocodeSearch } from "@/lib/geocode";
 
 // Nominatim's usage policy caps requests at roughly 1/sec and requires a
 // real, identifying User-Agent header -- something browser fetch() cannot
@@ -34,33 +35,10 @@ export async function GET(req: Request) {
   lastRequestByIp.set(ip, now);
   lastRequestAt = now;
 
-  const userAgent =
-    process.env.NOMINATIM_USER_AGENT ?? "RiderTracking/1.0 (ops contact: not-configured)";
-
-  // Short/ambiguous queries (e.g. a housing-scheme name that exists in
-  // several cities) can otherwise match a same-named place in an entirely
-  // different region -- restricting to the actual country(ies) of
-  // operation is the single biggest accuracy improvement Nominatim's API
-  // supports for this. Comma-separated ISO 3166-1 alpha-2 codes; unset
-  // means unrestricted (global) search, same as before this env var existed.
-  const countryCodes = process.env.NOMINATIM_COUNTRY_CODES;
-  const countryParam = countryCodes ? `&countrycodes=${encodeURIComponent(countryCodes)}` : "";
-
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1${countryParam}`,
-    { headers: { "User-Agent": userAgent } }
-  );
-
-  if (!res.ok) {
+  const results = await geocodeSearch(q);
+  if (results === null) {
     return NextResponse.json({ status: "error" }, { status: 502 });
   }
-
-  const data: { display_name: string; lat: string; lon: string }[] = await res.json();
-  const results = data.map((r) => ({
-    placeName: r.display_name,
-    lat: parseFloat(r.lat),
-    lng: parseFloat(r.lon),
-  }));
 
   return NextResponse.json({ status: "ok", results });
 }

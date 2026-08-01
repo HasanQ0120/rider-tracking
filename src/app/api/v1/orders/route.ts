@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
 import { runAutoAssignment } from "@/lib/autoAssign";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { geocodeAddress } from "@/lib/geocode";
 
 // The one genuinely public-facing, credential-only endpoint in the app --
 // a merchant's own backend calls this directly, no browser session
@@ -61,6 +62,23 @@ export async function POST(req: Request) {
   const resolvedPickupLat = pickup_lat ?? tenant.defaultPickupLat;
   const resolvedPickupLng = pickup_lng ?? tenant.defaultPickupLng;
 
+  // Coordinates are optional on this endpoint -- callers integrating over
+  // curl/webhook commonly only have a text address on hand. Best-effort
+  // only: a caller-provided pair always wins, and a failed/empty geocode
+  // never blocks order creation -- it just leaves the order exactly as
+  // coordinate-less as an explicit omission always has, showing the
+  // "waiting for a delivery location" placeholder on the customer page
+  // instead of a real pin.
+  let resolvedDeliveryLat = delivery_lat ?? null;
+  let resolvedDeliveryLng = delivery_lng ?? null;
+  if (resolvedDeliveryLat == null && resolvedDeliveryLng == null) {
+    const geocoded = await geocodeAddress(delivery_address);
+    if (geocoded) {
+      resolvedDeliveryLat = geocoded.lat;
+      resolvedDeliveryLng = geocoded.lng;
+    }
+  }
+
   const { data: order, error } = await service
     .from("orders")
     .insert({
@@ -68,8 +86,8 @@ export async function POST(req: Request) {
       customer_name,
       customer_phone: cleanPhoneInput(customer_phone),
       delivery_address,
-      delivery_lat: delivery_lat ?? null,
-      delivery_lng: delivery_lng ?? null,
+      delivery_lat: resolvedDeliveryLat,
+      delivery_lng: resolvedDeliveryLng,
       address_detail: address_detail?.trim() || null,
       pickup_lat: resolvedPickupLat ?? null,
       pickup_lng: resolvedPickupLng ?? null,
