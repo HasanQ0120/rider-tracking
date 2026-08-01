@@ -54,6 +54,13 @@ export const CUSTOMER_POLL_INTERVAL_MS = 2000;
 // the 300-400m range confirmed with the merchant, using the midpoint.
 export const AUTO_ASSIGN_RADIUS_M = 350;
 
+// Starting estimate for "close enough that a busy rider already heading
+// there should get this delivery too" -- unlike AUTO_ASSIGN_RADIUS_M this
+// hasn't been confirmed with the merchant yet; tune once real usage shows
+// whether nearby-neighborhood pairs (e.g. two adjacent localities) fall
+// inside or outside it.
+export const AUTO_ASSIGN_DESTINATION_RADIUS_M = 1500;
+
 // The single tenant that today's ops dashboard manages orders/riders for.
 // Ops has cross-tenant *visibility* (reads are never filtered), but until a
 // real tenant-switcher exists, ops-initiated writes (new order, new rider)
