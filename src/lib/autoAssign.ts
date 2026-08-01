@@ -8,8 +8,9 @@ const ACTIVE_STATUSES = ["assigned", "in_transit", "arrived"];
 
 type Position = { lat: number; lng: number; recordedAt: string };
 
-// Every active rider is a candidate -- there's no separate "on duty" state
-// gating eligibility (removed entirely; riders are available by default).
+// Every active rider who has opted into `available` is a candidate --
+// unlike the old on-duty system this removed, there's no location/geofence
+// check, just a rider-controlled boolean (see /rider/availability/[token]).
 // Ranked in four tiers, in order:
 //   1. Riders within AUTO_ASSIGN_RADIUS_M of the pickup point (using each
 //      rider's freshest current_locations reading from their own
@@ -40,7 +41,8 @@ export async function findRiderForAutoAssignment(
     .from("riders")
     .select("id")
     .eq("tenant_id", tenantId)
-    .eq("active", true);
+    .eq("active", true)
+    .eq("available", true);
   if (!riders || riders.length === 0) return null;
   const riderIds = riders.map((r) => r.id);
 

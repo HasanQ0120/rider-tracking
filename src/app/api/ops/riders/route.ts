@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
 import { getOpsHomeTenantId } from "@/lib/ops/homeTenant";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
+import { generateAvailabilityToken } from "@/lib/tokens";
+import { sendAvailabilityLink } from "@/lib/notify";
 
 export async function GET() {
   const guard = await requireOpsUserApi();
@@ -11,7 +13,7 @@ export async function GET() {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("riders")
-    .select("id, name, phone, license_plate, active, created_at")
+    .select("id, name, phone, license_plate, active, available, availability_token, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
@@ -30,6 +32,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "invalid_phone" }, { status: 400 });
   }
 
+  const cleanedPhone = cleanPhoneInput(phone);
+  const availabilityToken = generateAvailabilityToken();
+
   const supabase = createServiceClient();
   const tenantId = await getOpsHomeTenantId(supabase);
   const { data, error } = await supabase
@@ -37,12 +42,14 @@ export async function POST(req: Request) {
     .insert({
       tenant_id: tenantId,
       name,
-      phone: cleanPhoneInput(phone),
+      phone: cleanedPhone,
       license_plate,
+      availability_token: availabilityToken,
     })
     .select()
     .single();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
+  await sendAvailabilityLink(cleanedPhone, availabilityToken);
   return NextResponse.json({ rider: data });
 }

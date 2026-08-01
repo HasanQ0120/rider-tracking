@@ -32,6 +32,14 @@ export function generateDeviceKey(): string {
   return nanoid(24);
 }
 
+// A rider's one persistent, order-independent link -- unlike
+// generateTrackingToken (fresh per order, revoked on completion), this
+// never expires and is issued once at rider creation. Only ever used to
+// flip riders.available; no location/session data attaches to it.
+export function generateAvailabilityToken(): string {
+  return nanoid(28);
+}
+
 export function generatePin(): string {
   const n = Math.floor(Math.random() * 1_000_000);
   return n.toString().padStart(6, "0");

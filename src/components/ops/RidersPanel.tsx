@@ -18,6 +18,8 @@ type Rider = {
   phone: string;
   license_plate: string | null;
   active: boolean;
+  available?: boolean;
+  availability_token?: string | null;
   created_at: string;
   deliveredCount?: number;
   activeCount?: number;
@@ -46,8 +48,17 @@ export function RidersPanel({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<BulkResult | null>(null);
   const [importFileError, setImportFileError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function copyAvailabilityLink(rider: Rider) {
+    if (!rider.availability_token) return;
+    const url = `${window.location.origin}/rider/availability/${rider.availability_token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(rider.id);
+    setTimeout(() => setCopiedId((id) => (id === rider.id ? null : id)), 2000);
+  }
 
   function showPhoneError(message: string) {
     setPhoneError(message);
@@ -257,10 +268,24 @@ export function RidersPanel({
                     {r.activeCount} active
                   </span>
                 ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
+                    Idle
+                  </span>
+                )}
+                {r.available ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-status-success/15 px-2.5 py-1 text-xs font-medium text-status-success">
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    Available
+                    Accepting Orders
                   </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/40">
+                    Not Accepting Orders
+                  </span>
+                )}
+                {r.availability_token && (
+                  <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
+                    {copiedId === r.id ? "Copied!" : "Copy Link"}
+                  </Button>
                 )}
               </div>
             </div>

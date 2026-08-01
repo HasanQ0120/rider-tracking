@@ -42,6 +42,15 @@ export function sendRiderPin(phone: string, pin: string, customerName: string) {
   );
 }
 
+// Sent once, at rider creation -- this link is permanent (never expires,
+// never revoked), unlike sendRiderLink's fresh-per-order token.
+export function sendAvailabilityLink(phone: string, token: string) {
+  return sendNotification(
+    phone,
+    `Welcome! Toggle your availability for new deliveries anytime here: ${appUrl()}/rider/availability/${token}`
+  );
+}
+
 export function sendCustomerLink(phone: string, token: string) {
   return sendNotification(
     phone,

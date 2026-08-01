@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
 import { parseRiderCsv } from "@/lib/riderCsv";
+import { generateAvailabilityToken } from "@/lib/tokens";
+import { sendAvailabilityLink } from "@/lib/notify";
 
 export async function POST(req: Request) {
   const guard = await requireMerchantUserApi();
@@ -16,21 +18,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "ok", imported: 0, errors });
   }
 
+  const withTokens = valid.map((r) => ({
+    tenant_id: guard.tenantId,
+    name: r.name,
+    phone: r.phone,
+    license_plate: r.license_plate,
+    availability_token: generateAvailabilityToken(),
+  }));
+
   // Same RLS-enforced authenticated client as the single-rider create
   // route -- the "merchant inserts own riders" policy is what actually
   // scopes a ~400-row import to this tenant, not just this query.
-  const { data, error } = await guard.supabase
-    .from("riders")
-    .insert(
-      valid.map((r) => ({
-        tenant_id: guard.tenantId,
-        name: r.name,
-        phone: r.phone,
-        license_plate: r.license_plate,
-      }))
-    )
-    .select();
+  const { data, error } = await guard.supabase.from("riders").insert(withTokens).select();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
+  await Promise.all(withTokens.map((r) => sendAvailabilityLink(r.phone, r.availability_token)));
   return NextResponse.json({ status: "ok", imported: data?.length ?? 0, riders: data, errors });
 }

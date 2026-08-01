@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
 import { validateRiderFields } from "@/lib/riderValidation";
+import { generateAvailabilityToken } from "@/lib/tokens";
+import { sendAvailabilityLink } from "@/lib/notify";
 
 // Same auth/rate-limit shape as /api/v1/orders -- a merchant's own backend
 // calls this directly to register/sync riders (e.g. their existing ~100-
@@ -63,18 +65,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "ok", imported: 0, riders: [], errors });
   }
 
-  const { data, error } = await service
-    .from("riders")
-    .insert(
-      valid.map((r) => ({
-        tenant_id: tenant.id,
-        name: r.name,
-        phone: r.phone,
-        license_plate: r.license_plate,
-      }))
-    )
-    .select();
+  const withTokens = valid.map((r) => ({
+    tenant_id: tenant.id,
+    name: r.name,
+    phone: r.phone,
+    license_plate: r.license_plate,
+    availability_token: generateAvailabilityToken(),
+  }));
+
+  const { data, error } = await service.from("riders").insert(withTokens).select();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });
+  await Promise.all(withTokens.map((r) => sendAvailabilityLink(r.phone, r.availability_token)));
   return NextResponse.json({ status: "ok", imported: data?.length ?? 0, riders: data, errors });
 }
