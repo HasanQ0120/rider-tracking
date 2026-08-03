@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { RiderLocationPanel } from "@/components/ops/RiderLocationPanel";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 import { scrollToError } from "@/lib/scrollToError";
 
@@ -29,6 +30,7 @@ export function RidersPanel({
   initialRiders,
   createEndpoint = "/api/ops/riders",
   bulkImportEndpoint = "/api/ops/riders/bulk",
+  locationEndpointBase = "/api/ops/riders",
 }: {
   initialRiders: Rider[];
   // Lets the merchant dashboard reuse this exact form/UI against its own
@@ -36,10 +38,12 @@ export function RidersPanel({
   // existing behavior completely unchanged.
   createEndpoint?: string;
   bulkImportEndpoint?: string;
+  locationEndpointBase?: string;
 }) {
   const [riders, setRiders] = useState(initialRiders);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [selectedRiderId, setSelectedRiderId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
@@ -235,64 +239,95 @@ export function RidersPanel({
         </Card>
       )}
 
-      {riders.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-white/50">
-          No riders yet.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {riders.map((r) => (
-            <div
-              key={r.id}
-              className="animate-fade-in flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-surface-raised p-4 transition-colors hover:bg-white/5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-brand-navy text-sm font-semibold text-white">
-                  {r.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-medium text-white">{r.name}</p>
-                  <p className="text-xs text-white/50">
-                    {r.phone}
-                    {r.license_plate && (
-                      <span className="ml-2 font-mono text-brand-gold/80">{r.license_plate}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-right">
-                <span className="text-xs text-white/40">{r.deliveredCount ?? 0} deliveries</span>
-                {(r.activeCount ?? 0) > 0 ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {r.activeCount} active
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
-                    Idle
-                  </span>
-                )}
-                {r.available ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-status-success/15 px-2.5 py-1 text-xs font-medium text-status-success">
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    Accepting Orders
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/40">
-                    Not Accepting Orders
-                  </span>
-                )}
-                {r.availability_token && (
-                  <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
-                    {copiedId === r.id ? "Copied!" : "Copy Link"}
-                  </Button>
-                )}
-              </div>
+      <div className="flex gap-4">
+        <div
+          className={`min-w-0 flex-1 space-y-6 transition-all duration-300 ${
+            selectedRiderId ? "max-w-[50%]" : "max-w-full"
+          }`}
+        >
+          {riders.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-white/50">
+              No riders yet.
             </div>
-          ))}
+          ) : (
+            <div className="space-y-3">
+              {riders.map((r) => (
+                <div
+                  key={r.id}
+                  className={`animate-fade-in flex items-center justify-between gap-4 rounded-xl border p-4 transition-colors ${
+                    r.id === selectedRiderId
+                      ? "border-brand-gold bg-brand-gold/10"
+                      : "border-white/10 bg-surface-raised hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-brand-navy text-sm font-semibold text-white">
+                      {r.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{r.name}</p>
+                      <p className="text-xs text-white/50">
+                        {r.phone}
+                        {r.license_plate && (
+                          <span className="ml-2 font-mono text-brand-gold/80">{r.license_plate}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-3 text-right">
+                    <span className="text-xs text-white/40">{r.deliveredCount ?? 0} deliveries</span>
+                    {(r.activeCount ?? 0) > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {r.activeCount} active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
+                        Idle
+                      </span>
+                    )}
+                    {r.available ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-status-success/15 px-2.5 py-1 text-xs font-medium text-status-success">
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        Accepting Orders
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/40">
+                        Not Accepting Orders
+                      </span>
+                    )}
+                    {r.availability_token && (
+                      <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
+                        {copiedId === r.id ? "Copied!" : "Copy Link"}
+                      </Button>
+                    )}
+                    <Button
+                      variant={r.id === selectedRiderId ? "accent" : "accent-outline"}
+                      size="sm"
+                      onClick={() => setSelectedRiderId(r.id)}
+                    >
+                      Track Location
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-white/40">{riders.length} riders registered</p>
         </div>
-      )}
-      <p className="text-xs text-white/40">{riders.length} riders registered</p>
+
+        {selectedRiderId && (
+          <div className="h-[520px] w-1/2 shrink-0 animate-fade-in">
+            <RiderLocationPanel
+              key={selectedRiderId}
+              riderId={selectedRiderId}
+              riderName={riders.find((r) => r.id === selectedRiderId)?.name ?? ""}
+              endpointBase={locationEndpointBase}
+              onClose={() => setSelectedRiderId(null)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

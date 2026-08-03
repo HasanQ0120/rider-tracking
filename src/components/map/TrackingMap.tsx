@@ -133,6 +133,9 @@ export function TrackingMap({
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const markerAnimRefs = useRef<Record<string, number>>({});
+  // Last label bound per marker id -- lets the update path below skip
+  // rebinding the tooltip when the label hasn't actually changed.
+  const markerLabelRefs = useRef<Record<string, string | undefined>>({});
   // Refs (not the props directly) so the map-click listener and each
   // marker's dragend listener -- both attached once, at creation time --
   // always call the latest callback instead of a stale closure.
@@ -233,6 +236,7 @@ export function TrackingMap({
       mapRef.current = null;
       leafletRef.current = null;
       markerRefs.current = {};
+      markerLabelRefs.current = {};
       routeLineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -246,6 +250,18 @@ export function TrackingMap({
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
+        if (markerLabelRefs.current[marker.id] !== marker.label) {
+          markerLabelRefs.current[marker.id] = marker.label;
+          if (marker.label) {
+            if (existing.getTooltip()) {
+              existing.setTooltipContent(marker.label);
+            } else {
+              existing.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+            }
+          } else if (existing.getTooltip()) {
+            existing.unbindTooltip();
+          }
+        }
         // Skip re-animating unless the commanded target actually moved --
         // e.g. right after the user's own drag already put it exactly there
         // (see dragend below), or a re-render fired for an unrelated reason
@@ -303,6 +319,10 @@ export function TrackingMap({
         const m = L.marker([marker.lat, marker.lng], { icon, draggable: marker.draggable ?? false }).addTo(
           map
         );
+        if (marker.label) {
+          m.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+        }
+        markerLabelRefs.current[marker.id] = marker.label;
         if (marker.draggable) {
           m.on("dragend", () => {
             const pos = m.getLatLng();

@@ -34,6 +34,7 @@ export default async function MerchantRidersPage() {
         initialRiders={ridersWithCounts}
         createEndpoint="/api/merchant/riders"
         bulkImportEndpoint="/api/merchant/riders/bulk"
+        locationEndpointBase="/api/merchant/riders"
       />
     </div>
   );
