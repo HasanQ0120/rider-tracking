@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { haversineMeters } from "@/lib/geo";
-import { ROUTE_REFETCH_MIN_DISTANCE_M, ROUTE_REFETCH_MIN_INTERVAL_MS } from "@/lib/config";
+import { ROUTE_REFETCH_MIN_DISTANCE_M, ROUTE_REFETCH_MIN_INTERVAL_MS, MARKER_MIN_MOVEMENT_M } from "@/lib/config";
 
 export type MapMarker = {
   id: string;
@@ -281,11 +281,13 @@ export function TrackingMap({
         // otherwise every such re-render would cancel and restart the
         // animation from wherever it happened to be, which reads as the
         // marker barely creeping instead of gliding smoothly to place.
+        // Uses a real-world distance floor (MARKER_MIN_MOVEMENT_M), not
+        // exact equality -- GPS sensor noise alone would otherwise
+        // re-trigger the glide on every poll tick even standing still.
         const lastTarget = markerTargetRefs.current[marker.id];
         if (
           lastTarget &&
-          Math.abs(lastTarget.lat - marker.lat) < 1e-9 &&
-          Math.abs(lastTarget.lng - marker.lng) < 1e-9
+          haversineMeters(lastTarget.lat, lastTarget.lng, marker.lat, marker.lng) < MARKER_MIN_MOVEMENT_M
         ) {
           continue;
         }

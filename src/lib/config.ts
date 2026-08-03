@@ -44,6 +44,13 @@ export const MARKER_COLOR_TRACKED_RIDER = "#FFD700";
 export const ROUTE_REFETCH_MIN_DISTANCE_M = 40;
 export const ROUTE_REFETCH_MIN_INTERVAL_MS = 15000;
 
+// Below this, a reported position change is treated as GPS sensor noise,
+// not real movement -- consumer phone GPS commonly drifts a meter or two
+// between readings even standing still. Without this floor, every such
+// drift re-triggers the marker's glide animation, which reads as a
+// constant visible tremor every poll tick.
+export const MARKER_MIN_MOVEMENT_M = 3;
+
 // How often the customer page polls for the rider's location + order status.
 // Plain polling through our own API, not a Supabase Realtime subscription --
 // see /api/customer/[token]/poll for why. Tightened from 4s so the
