@@ -183,7 +183,20 @@ export function RidersPanel({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mapMode.kind !== "closed"
+          // Breaks out of the two nested centered max-width containers this
+          // page sits inside (the ops/merchant layout's max-w-5xl and this
+          // page's own max-w-2xl) so the map can actually use the screen's
+          // width instead of a slice of an already-narrow centered column.
+          // Math: margin-left cancels out through any number of `mx-auto`
+          // ancestors because percentage margins resolve against the
+          // immediate parent's width, not the viewport -- see the -mx trick.
+          ? "w-screen max-w-none space-y-6 px-6 ml-[calc(50%_-_50vw)]"
+          : "space-y-6"
+      }
+    >
       <div className="flex items-center justify-end gap-2">
         <Button
           variant={mapMode.kind === "all" ? "accent" : "accent-outline"}
@@ -299,10 +312,10 @@ export function RidersPanel({
         </Card>
       )}
 
-      <div className="flex gap-4">
+      <div className={`flex gap-4 ${mapMode.kind !== "closed" ? "h-[calc(100vh-260px)]" : ""}`}>
         <div
-          className={`min-w-0 flex-1 space-y-6 transition-all duration-300 ${
-            mapMode.kind !== "closed" ? "max-w-[32%]" : "max-w-full"
+          className={`min-w-0 space-y-6 transition-all duration-300 ${
+            mapMode.kind !== "closed" ? "w-full max-w-sm shrink-0 overflow-y-auto" : "max-w-full flex-1"
           }`}
         >
           {mapMode.kind === "single" && selectedRider ? (
@@ -346,7 +359,10 @@ export function RidersPanel({
         </div>
 
         {mapMode.kind !== "closed" && (
-          <div className="h-[520px] flex-1 animate-fade-in">
+          // No explicit height here -- it's a flex child of the row above,
+          // which now has a real height (h-[calc(100vh-260px)]) and the
+          // row's default align-items: stretch fills it automatically.
+          <div className="flex-1 animate-fade-in">
             {mapMode.kind === "all" ? (
               <AllRidersMapPanel
                 riders={riders.map((r) => ({ id: r.id, name: r.name }))}
