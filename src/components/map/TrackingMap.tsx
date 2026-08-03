@@ -106,6 +106,7 @@ export function TrackingMap({
   routeTo,
   onMapClick,
   onMarkerDrag,
+  onMarkerClick,
   onRouteInfo,
 }: {
   markers: MapMarker[];
@@ -120,6 +121,10 @@ export function TrackingMap({
   // their maps does nothing extra.
   onMapClick?: (lat: number, lng: number) => void;
   onMarkerDrag?: (id: string, lat: number, lng: number) => void;
+  // Opt-in, used by the "Show All" riders map to select one rider by
+  // clicking their marker. Leaflet markers stop the click from also
+  // bubbling to the map's own onMapClick handler above.
+  onMarkerClick?: (id: string) => void;
   // Fires whenever the route line is (re)fetched, with the same
   // OSRM-provided travel-time estimate used to draw the line -- no
   // separate request. Called with null when the route line is hidden
@@ -133,11 +138,15 @@ export function TrackingMap({
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const markerRefs = useRef<Record<string, Leaflet.Marker>>({});
   const markerAnimRefs = useRef<Record<string, number>>({});
+  // Last label bound per marker id -- lets the update path below skip
+  // rebinding the tooltip when the label hasn't actually changed.
+  const markerLabelRefs = useRef<Record<string, string | undefined>>({});
   // Refs (not the props directly) so the map-click listener and each
   // marker's dragend listener -- both attached once, at creation time --
   // always call the latest callback instead of a stale closure.
   const onMapClickRef = useRef(onMapClick);
   const onMarkerDragRef = useRef(onMarkerDrag);
+  const onMarkerClickRef = useRef(onMarkerClick);
   // Last commanded rotation per arrow marker, used as the animation's
   // starting angle for the next update (see shortestAngleDelta above).
   const markerHeadingRefs = useRef<Record<string, number>>({});
@@ -170,6 +179,10 @@ export function TrackingMap({
   useEffect(() => {
     onMarkerDragRef.current = onMarkerDrag;
   }, [onMarkerDrag]);
+
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -233,6 +246,7 @@ export function TrackingMap({
       mapRef.current = null;
       leafletRef.current = null;
       markerRefs.current = {};
+      markerLabelRefs.current = {};
       routeLineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -246,6 +260,18 @@ export function TrackingMap({
     for (const marker of markers) {
       const existing = markerRefs.current[marker.id];
       if (existing) {
+        if (markerLabelRefs.current[marker.id] !== marker.label) {
+          markerLabelRefs.current[marker.id] = marker.label;
+          if (marker.label) {
+            if (existing.getTooltip()) {
+              existing.setTooltipContent(marker.label);
+            } else {
+              existing.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+            }
+          } else if (existing.getTooltip()) {
+            existing.unbindTooltip();
+          }
+        }
         // Skip re-animating unless the commanded target actually moved --
         // e.g. right after the user's own drag already put it exactly there
         // (see dragend below), or a re-render fired for an unrelated reason
@@ -303,12 +329,19 @@ export function TrackingMap({
         const m = L.marker([marker.lat, marker.lng], { icon, draggable: marker.draggable ?? false }).addTo(
           map
         );
+        if (marker.label) {
+          m.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+        }
+        markerLabelRefs.current[marker.id] = marker.label;
         if (marker.draggable) {
           m.on("dragend", () => {
             const pos = m.getLatLng();
             onMarkerDragRef.current?.(marker.id, pos.lat, pos.lng);
           });
         }
+        m.on("click", () => {
+          onMarkerClickRef.current?.(marker.id);
+        });
         markerRefs.current[marker.id] = m;
         markerTargetRefs.current[marker.id] = { lat: marker.lat, lng: marker.lng };
         if (isArrow) markerHeadingRefs.current[marker.id] = marker.heading ?? 0;

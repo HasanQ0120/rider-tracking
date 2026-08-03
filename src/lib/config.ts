@@ -31,6 +31,10 @@ export const PENDING_CONFIRMATION_TIMEOUT_MINUTES = 30;
 // ops New Order preview, so all three stay in sync if this ever changes.
 export const MARKER_COLOR_CUSTOMER = "#DC2626";
 export const MARKER_COLOR_RIDER = "#000000";
+// The admin-facing "Track Location" panel's marker -- matches --color-brand-gold
+// in globals.css exactly, kept as its own literal here since this file has
+// no dependency on Tailwind/CSS variables.
+export const MARKER_COLOR_TRACKED_RIDER = "#FFD700";
 
 // Throttle for OSRM route-line recalculation: only refetch when the rider
 // has moved further than this since the last fetch, or enough time has
