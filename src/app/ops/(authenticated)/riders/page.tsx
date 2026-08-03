@@ -33,7 +33,6 @@ export default async function RidersPage() {
 
   return (
     <div className="mx-auto max-w-2xl animate-slide-up">
-      <h1 className="mb-6 text-2xl font-semibold text-white">Riders</h1>
       <RidersPanel initialRiders={ridersWithCounts} />
     </div>
   );

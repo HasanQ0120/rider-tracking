@@ -312,7 +312,7 @@ export function RidersPanel({
         </Card>
       )}
 
-      <div className={`flex gap-4 ${mapMode.kind !== "closed" ? "h-[calc(100vh-260px)]" : ""}`}>
+      <div className={`flex gap-4 ${mapMode.kind !== "closed" ? "h-[calc(100vh-210px)]" : ""}`}>
         <div
           className={`min-w-0 space-y-6 transition-all duration-300 ${
             mapMode.kind !== "closed" ? "w-full max-w-sm shrink-0 overflow-y-auto" : "max-w-full flex-1"

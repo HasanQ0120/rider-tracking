@@ -11,6 +11,35 @@ type Snapshot = {
   pickup: { lat: number; lng: number } | null;
 };
 
+// Riders with no GPS data all fall back to the exact same tenant pickup
+// point, which would otherwise stack their markers perfectly on top of one
+// another -- only the topmost is visible/clickable, the rest are silently
+// hidden. Spreads any group sharing identical coordinates into a small
+// ring around that point so every rider stays individually selectable.
+function spreadOverlappingMarkers(markers: MapMarker[]): MapMarker[] {
+  const groups = new Map<string, MapMarker[]>();
+  for (const m of markers) {
+    const key = `${m.lat.toFixed(6)},${m.lng.toFixed(6)}`;
+    const group = groups.get(key);
+    if (group) group.push(m);
+    else groups.set(key, [m]);
+  }
+
+  const result: MapMarker[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const radiusDeg = 0.0004; // ~40m -- enough to separate pins at any normal zoom, not enough to look "wrong"
+    group.forEach((m, i) => {
+      const angle = (2 * Math.PI * i) / group.length;
+      result.push({ ...m, lat: m.lat + radiusDeg * Math.cos(angle), lng: m.lng + radiusDeg * Math.sin(angle) });
+    });
+  }
+  return result;
+}
+
 export function AllRidersMapPanel({
   riders,
   endpointBase,
@@ -45,7 +74,7 @@ export function AllRidersMapPanel({
     };
   }, [endpointBase]);
 
-  const markers: MapMarker[] = riders.flatMap((r) => {
+  const rawMarkers: MapMarker[] = riders.flatMap((r) => {
     const snapshot = snapshots?.[r.id];
     if (!snapshot) return [];
     if (snapshot.loc) {
@@ -72,6 +101,7 @@ export function AllRidersMapPanel({
     }
     return [];
   });
+  const markers = spreadOverlappingMarkers(rawMarkers);
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-surface-raised">
