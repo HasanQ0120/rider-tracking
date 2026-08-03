@@ -106,6 +106,7 @@ export function TrackingMap({
   routeTo,
   onMapClick,
   onMarkerDrag,
+  onMarkerClick,
   onRouteInfo,
 }: {
   markers: MapMarker[];
@@ -120,6 +121,10 @@ export function TrackingMap({
   // their maps does nothing extra.
   onMapClick?: (lat: number, lng: number) => void;
   onMarkerDrag?: (id: string, lat: number, lng: number) => void;
+  // Opt-in, used by the "Show All" riders map to select one rider by
+  // clicking their marker. Leaflet markers stop the click from also
+  // bubbling to the map's own onMapClick handler above.
+  onMarkerClick?: (id: string) => void;
   // Fires whenever the route line is (re)fetched, with the same
   // OSRM-provided travel-time estimate used to draw the line -- no
   // separate request. Called with null when the route line is hidden
@@ -141,6 +146,7 @@ export function TrackingMap({
   // always call the latest callback instead of a stale closure.
   const onMapClickRef = useRef(onMapClick);
   const onMarkerDragRef = useRef(onMarkerDrag);
+  const onMarkerClickRef = useRef(onMarkerClick);
   // Last commanded rotation per arrow marker, used as the animation's
   // starting angle for the next update (see shortestAngleDelta above).
   const markerHeadingRefs = useRef<Record<string, number>>({});
@@ -173,6 +179,10 @@ export function TrackingMap({
   useEffect(() => {
     onMarkerDragRef.current = onMarkerDrag;
   }, [onMarkerDrag]);
+
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -329,6 +339,9 @@ export function TrackingMap({
             onMarkerDragRef.current?.(marker.id, pos.lat, pos.lng);
           });
         }
+        m.on("click", () => {
+          onMarkerClickRef.current?.(marker.id);
+        });
         markerRefs.current[marker.id] = m;
         markerTargetRefs.current[marker.id] = { lat: marker.lat, lng: marker.lng };
         if (isArrow) markerHeadingRefs.current[marker.id] = marker.heading ?? 0;
