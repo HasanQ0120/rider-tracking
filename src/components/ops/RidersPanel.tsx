@@ -53,6 +53,11 @@ function RiderInfo({ r }: { r: Rider }) {
 function RiderBadges({ r }: { r: Rider }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {!r.active && (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-status-danger/15 px-2.5 py-1 text-xs font-medium text-status-danger">
+          Inactive
+        </span>
+      )}
       <span className="text-xs text-white/40">{r.deliveredCount ?? 0} deliveries</span>
       {(r.activeCount ?? 0) > 0 ? (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
@@ -105,6 +110,13 @@ export function RidersPanel({
   const [importResult, setImportResult] = useState<BulkResult | null>(null);
   const [importFileError, setImportFileError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editPlate, setEditPlate] = useState("");
+  const [editPhoneError, setEditPhoneError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +128,59 @@ export function RidersPanel({
     await navigator.clipboard.writeText(url);
     setCopiedId(rider.id);
     setTimeout(() => setCopiedId((id) => (id === rider.id ? null : id)), 2000);
+  }
+
+  function startEdit(rider: Rider) {
+    setEditingId(rider.id);
+    setEditName(rider.name);
+    setEditPhone(rider.phone);
+    setEditPlate(rider.license_plate ?? "");
+    setEditPhoneError(null);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    if (!isValidPakistaniMobile(editPhone)) {
+      setEditPhoneError(PK_MOBILE_HINT);
+      return;
+    }
+    setEditSaving(true);
+    const res = await fetch(`${locationEndpointBase}/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editName.trim(),
+        phone: cleanPhoneInput(editPhone),
+        license_plate: editPlate.trim() || null,
+      }),
+    });
+    const data = await res.json();
+    setEditSaving(false);
+    if (data.status === "ok" && data.rider) {
+      setRiders((prev) => prev.map((r) => (r.id === editingId ? { ...r, ...data.rider } : r)));
+      setEditingId(null);
+    } else if (data.status === "invalid_phone") {
+      setEditPhoneError(PK_MOBILE_HINT);
+    }
+  }
+
+  // Deactivating (not deleting) is the only safe option here -- every rider
+  // in real use already has order history, and orders reference riders by
+  // foreign key, so a true delete would either fail outright or corrupt
+  // that history. This reuses the existing `active` flag that
+  // auto-assignment already respects, and is fully reversible.
+  async function toggleActive(rider: Rider) {
+    setTogglingId(rider.id);
+    const res = await fetch(`${locationEndpointBase}/${rider.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !rider.active }),
+    });
+    const data = await res.json();
+    setTogglingId(null);
+    if (data.status === "ok" && data.rider) {
+      setRiders((prev) => prev.map((r) => (r.id === rider.id ? { ...r, ...data.rider } : r)));
+    }
   }
 
   function showPhoneError(message: string) {
@@ -180,6 +245,57 @@ export function RidersPanel({
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function renderEditForm() {
+    return (
+      <div className="space-y-2">
+        <Input placeholder="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+        <div>
+          <Input
+            placeholder="Phone (e.g. 03XXXXXXXXX)"
+            value={editPhone}
+            onChange={(e) => {
+              setEditPhone(e.target.value);
+              if (editPhoneError) setEditPhoneError(null);
+            }}
+            className={editPhoneError ? "border-status-danger" : ""}
+          />
+          {editPhoneError && (
+            <p className="mt-1 text-sm text-status-danger" role="alert">
+              {editPhoneError}
+            </p>
+          )}
+        </div>
+        <Input
+          placeholder="License plate (e.g. ABC-123)"
+          value={editPlate}
+          onChange={(e) => setEditPlate(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={saveEdit} disabled={editSaving || !editName.trim() || !editPhone}>
+            {editSaving && <Spinner className="h-4 w-4" />}
+            Save
+          </Button>
+          <Button variant="accent-outline" size="sm" onClick={() => setEditingId(null)}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderEditDeactivateButtons(r: Rider) {
+    return (
+      <>
+        <Button variant="accent-outline" size="sm" onClick={() => startEdit(r)}>
+          Edit
+        </Button>
+        <Button variant="accent-outline" size="sm" onClick={() => toggleActive(r)} disabled={togglingId === r.id}>
+          {togglingId === r.id ? <Spinner className="h-4 w-4" /> : r.active ? "Deactivate" : "Activate"}
+        </Button>
+      </>
+    );
   }
 
   return (
@@ -323,12 +439,21 @@ export function RidersPanel({
               <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "all" })}>
                 ← Back to all riders
               </Button>
-              <RiderInfo r={selectedRider} />
-              <RiderBadges r={selectedRider} />
-              {selectedRider.availability_token && (
-                <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(selectedRider)}>
-                  {copiedId === selectedRider.id ? "Copied!" : "Copy Link"}
-                </Button>
+              {editingId === selectedRider.id ? (
+                renderEditForm()
+              ) : (
+                <>
+                  <RiderInfo r={selectedRider} />
+                  <RiderBadges r={selectedRider} />
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRider.availability_token && (
+                      <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(selectedRider)}>
+                        {copiedId === selectedRider.id ? "Copied!" : "Copy Link"}
+                      </Button>
+                    )}
+                    {renderEditDeactivateButtons(selectedRider)}
+                  </div>
+                </>
               )}
             </div>
           ) : riders.length === 0 ? (
@@ -339,18 +464,25 @@ export function RidersPanel({
             <div className="space-y-3">
               {riders.map((r) => (
                 <div key={r.id} className="animate-fade-in space-y-3 rounded-xl border border-white/10 bg-surface-raised p-4 transition-colors hover:bg-white/5">
-                  <RiderInfo r={r} />
-                  <RiderBadges r={r} />
-                  <div className="flex flex-wrap gap-2">
-                    {r.availability_token && (
-                      <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
-                        {copiedId === r.id ? "Copied!" : "Copy Link"}
-                      </Button>
-                    )}
-                    <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "single", riderId: r.id })}>
-                      Track Location
-                    </Button>
-                  </div>
+                  {editingId === r.id ? (
+                    renderEditForm()
+                  ) : (
+                    <>
+                      <RiderInfo r={r} />
+                      <RiderBadges r={r} />
+                      <div className="flex flex-wrap gap-2">
+                        {r.availability_token && (
+                          <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
+                            {copiedId === r.id ? "Copied!" : "Copy Link"}
+                          </Button>
+                        )}
+                        <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "single", riderId: r.id })}>
+                          Track Location
+                        </Button>
+                        {renderEditDeactivateButtons(r)}
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
