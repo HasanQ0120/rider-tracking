@@ -7,7 +7,13 @@ export const RESEND_RATE_LIMIT_MINUTES = 2;
 // Used consistently for every proximity check: "I've Arrived" gating,
 // the customer's independent Complete button, and the rider's Mark
 // Complete confirmation flow -- one distance, one meaning, everywhere.
-export const PROXIMITY_RADIUS_M = 100;
+// Widened from 100m after real flagged deliveries showed riders genuinely
+// on-site still getting flagged -- auto-geocoded text addresses with no
+// house number (e.g. a street/DHA-phase reference, no precise pin) can
+// resolve 200m+ from the actual door, not a GPS accuracy problem (checked:
+// reported accuracy on those readings was 11-19m, nowhere near enough to
+// explain the gap).
+export const PROXIMITY_RADIUS_M = 300;
 export const PROXIMITY_SUSTAIN_SECONDS = 90;
 export const CONNECTION_LOST_TIMEOUT_S = 25;
 export const TOKEN_TIME_BUDGET_HOURS = 4;

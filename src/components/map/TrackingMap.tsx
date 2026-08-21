@@ -69,6 +69,27 @@ function buildIconHtml(marker: MapMarker): string {
   </svg>`;
 }
 
+// Leaflet tooltips default to interactive:false (pointer-events: none) --
+// clicks on the label bubble fall straight through to the map underneath
+// rather than reaching the marker, since the tooltip floats above the
+// marker's own screen position. Riders' name labels on the "Show All" map
+// are exactly the thing someone would naturally click, so this makes the
+// tooltip itself clickable and wires it to the same select callback as
+// the marker icon.
+function bindClickableTooltip(
+  marker: Leaflet.Marker,
+  label: string,
+  markerId: string,
+  onMarkerClickRef: { current?: (id: string) => void }
+) {
+  marker.bindTooltip(label, { permanent: true, direction: "top", offset: [0, -10], interactive: true });
+  const el = marker.getTooltip()?.getElement();
+  if (el) {
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => onMarkerClickRef.current?.(markerId));
+  }
+}
+
 function animateMarkerTo(
   marker: Leaflet.Marker,
   to: LatLng,
@@ -266,7 +287,7 @@ export function TrackingMap({
             if (existing.getTooltip()) {
               existing.setTooltipContent(marker.label);
             } else {
-              existing.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+              bindClickableTooltip(existing, marker.label, marker.id, onMarkerClickRef);
             }
           } else if (existing.getTooltip()) {
             existing.unbindTooltip();
@@ -332,7 +353,7 @@ export function TrackingMap({
           map
         );
         if (marker.label) {
-          m.bindTooltip(marker.label, { permanent: true, direction: "top", offset: [0, -10] });
+          bindClickableTooltip(m, marker.label, marker.id, onMarkerClickRef);
         }
         markerLabelRefs.current[marker.id] = marker.label;
         if (marker.draggable) {

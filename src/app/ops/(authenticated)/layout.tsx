@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OpsNav } from "@/components/ops/OpsNav";
 import { LogoutButton } from "@/components/ops/LogoutButton";
 import { Logo } from "@/components/ui/Logo";
+import { ViewBadge } from "@/components/ui/ViewBadge";
 import { requireOpsUser } from "@/lib/ops/authGuard";
 
 // Every ops page/route already independently calls requireOpsUser() or
@@ -25,7 +26,10 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
         <nav className="flex items-center gap-1">
           <OpsNav />
         </nav>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <ViewBadge label="Ops View" />
+          <LogoutButton />
+        </div>
       </header>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>

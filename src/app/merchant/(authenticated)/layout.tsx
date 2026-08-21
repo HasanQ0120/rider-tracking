@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MerchantNav } from "@/components/merchant/MerchantNav";
 import { MerchantLogoutButton } from "@/components/merchant/MerchantLogoutButton";
 import { Logo } from "@/components/ui/Logo";
+import { ViewBadge } from "@/components/ui/ViewBadge";
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
 
 export default async function MerchantLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,10 @@ export default async function MerchantLayout({ children }: { children: React.Rea
         <nav className="flex items-center gap-1">
           <MerchantNav />
         </nav>
-        <MerchantLogoutButton />
+        <div className="flex items-center gap-3">
+          <ViewBadge label="Merchant View" />
+          <MerchantLogoutButton />
+        </div>
       </header>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>
