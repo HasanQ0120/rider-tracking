@@ -35,7 +35,12 @@ export function parseRiderCsv(csvText: string): { valid: ParsedRider[]; errors: 
 
   records.forEach((row, index) => {
     const line = index + 2;
-    const result = validateRiderFields({ name: row.name, phone: row.phone, license_plate: row.licenseplate });
+    const result = validateRiderFields({
+      name: row.name,
+      phone: row.phone,
+      license_plate: row.licenseplate,
+      login_pin: row.loginpin,
+    });
     if (!result.ok) {
       errors.push({ line, reason: result.reason });
       return;

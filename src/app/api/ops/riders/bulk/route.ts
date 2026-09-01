@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
 import { getOpsHomeTenantId } from "@/lib/ops/homeTenant";
 import { parseRiderCsv } from "@/lib/riderCsv";
-import { generateAvailabilityToken } from "@/lib/tokens";
+import { buildRiderInsertRows } from "@/lib/rider/insertRows";
 import { sendAvailabilityLink } from "@/lib/notify";
 
 export async function POST(req: Request) {
@@ -22,13 +22,7 @@ export async function POST(req: Request) {
 
   const supabase = createServiceClient();
   const tenantId = await getOpsHomeTenantId(supabase);
-  const withTokens = valid.map((r) => ({
-    tenant_id: tenantId,
-    name: r.name,
-    phone: r.phone,
-    license_plate: r.license_plate,
-    availability_token: generateAvailabilityToken(),
-  }));
+  const withTokens = await buildRiderInsertRows(tenantId, valid);
   const { data, error } = await supabase.from("riders").insert(withTokens).select();
 
   if (error) return NextResponse.json({ status: "error" }, { status: 500 });

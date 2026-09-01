@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
-import { validateRiderFields } from "@/lib/riderValidation";
-import { generateAvailabilityToken } from "@/lib/tokens";
+import { validateRiderFields, type ParsedRider } from "@/lib/riderValidation";
+import { buildRiderInsertRows } from "@/lib/rider/insertRows";
 import { sendAvailabilityLink } from "@/lib/notify";
 
-// Same auth/rate-limit shape as /api/v1/orders -- a merchant's own backend
-// calls this directly to register/sync riders (e.g. their existing ~100-
-// rider roster) instead of manual entry or a one-off CSV upload.
 const MIN_INTERVAL_MS = 500;
 const lastRequestByTenant = new Map<string, number>();
 
@@ -33,10 +30,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
 
-  // Accepts a batch ({ riders: [...] }) or a single rider object directly --
-  // registering just one rider shouldn't require wrapping it in an array.
   const inputRiders: unknown[] = Array.isArray((body as Record<string, unknown>).riders)
-    ? (body as Record<string, unknown>).riders as unknown[]
+    ? ((body as Record<string, unknown>).riders as unknown[])
     : "name" in body || "phone" in body
       ? [body]
       : [];
@@ -45,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
 
-  const valid: { name: string; phone: string; license_plate: string }[] = [];
+  const valid: ParsedRider[] = [];
   const errors: { index: number; reason: string }[] = [];
 
   inputRiders.forEach((item, index) => {
@@ -65,13 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "ok", imported: 0, riders: [], errors });
   }
 
-  const withTokens = valid.map((r) => ({
-    tenant_id: tenant.id,
-    name: r.name,
-    phone: r.phone,
-    license_plate: r.license_plate,
-    availability_token: generateAvailabilityToken(),
-  }));
+  const withTokens = await buildRiderInsertRows(tenant.id, valid);
 
   const { data, error } = await service.from("riders").insert(withTokens).select();
 

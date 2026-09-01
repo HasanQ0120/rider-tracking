@@ -104,7 +104,9 @@ export function RidersPanel({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
+  const [loginPin, setLoginPin] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [loginPinError, setLoginPinError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<BulkResult | null>(null);
@@ -193,6 +195,10 @@ export function RidersPanel({
       showPhoneError(PK_MOBILE_HINT);
       return;
     }
+    if (!/^\d{6}$/.test(loginPin.trim())) {
+      setLoginPinError("Login PIN must be exactly 6 digits.");
+      return;
+    }
     setSubmitting(true);
     const res = await fetch(createEndpoint, {
       method: "POST",
@@ -201,6 +207,7 @@ export function RidersPanel({
         name,
         phone: cleanPhoneInput(phone),
         license_plate: licensePlate.trim(),
+        login_pin: loginPin.trim(),
       }),
     });
     const data = await res.json();
@@ -210,9 +217,17 @@ export function RidersPanel({
       setName("");
       setPhone("");
       setLicensePlate("");
+      setLoginPin("");
+      setLoginPinError(null);
       setShowAddForm(false);
     } else if (data.status === "invalid_phone") {
       showPhoneError(PK_MOBILE_HINT);
+    } else if (data.reason) {
+      if (String(data.reason).includes("PIN")) {
+        setLoginPinError(String(data.reason));
+      } else {
+        showPhoneError(String(data.reason));
+      }
     }
   }
 
@@ -343,8 +358,9 @@ export function RidersPanel({
         <Card title="Bulk Import Riders" className="animate-slide-up">
           <p className="mb-3 text-sm text-white/50">
             A CSV file with columns <code className="text-white/70">name</code>,{" "}
-            <code className="text-white/70">phone</code>, and{" "}
-            <code className="text-white/70">license_plate</code> (any column order, header row
+            <code className="text-white/70">phone</code>,{" "}
+            <code className="text-white/70">license_plate</code>, and{" "}
+            <code className="text-white/70">login_pin</code> (any column order, header row
             required).
           </p>
           {importFileError && (
@@ -420,7 +436,28 @@ export function RidersPanel({
               value={licensePlate}
               onChange={(e) => setLicensePlate(e.target.value)}
             />
-            <Button onClick={addRider} disabled={submitting || !name || !phone || !licensePlate.trim()}>
+            <div>
+              <Input
+                placeholder="App login PIN (6 digits)"
+                value={loginPin}
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(e) => {
+                  setLoginPin(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  if (loginPinError) setLoginPinError(null);
+                }}
+                className={loginPinError ? "border-status-danger" : ""}
+              />
+              {loginPinError && (
+                <p className="mt-1 text-sm text-status-danger" role="alert">
+                  {loginPinError}
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={addRider}
+              disabled={submitting || !name || !phone || !licensePlate.trim() || loginPin.length !== 6}
+            >
               {submitting && <Spinner className="h-4 w-4" />}
               Add Rider
             </Button>
