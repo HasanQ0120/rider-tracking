@@ -2,10 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { MerchantButton, MerchantInput } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { Logo } from "@/components/ui/Logo";
@@ -70,6 +68,9 @@ function MerchantLoginForm() {
   const [loading, setLoading] = useState(false);
   const [branding, setBranding] = useState<LoginBranding | null>(null);
 
+  const primaryColor = branding?.primaryColor ?? DEFAULT_MERCHANT_PRIMARY;
+  const secondaryColor = branding?.secondaryColor ?? DEFAULT_MERCHANT_SECONDARY;
+
   useEffect(() => {
     if (searchParams.get("error") === "not_authorized") {
       setError("This account isn't provisioned for merchant access, or has been deactivated.");
@@ -131,55 +132,63 @@ function MerchantLoginForm() {
     }
   }
 
-  const headerPrimary = branding?.primaryColor ?? DEFAULT_MERCHANT_PRIMARY;
-  const headerSecondary = branding?.secondaryColor ?? DEFAULT_MERCHANT_SECONDARY;
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-surface p-6">
-      <div
-        className="mb-8 w-full max-w-sm rounded-xl border border-white/10 px-6 py-5 text-center animate-slide-up"
-        style={{ backgroundColor: headerPrimary }}
-      >
-        {branding ? (
-          <>
-            <div className="flex justify-center">
-              <TenantLogo
-                name={branding.name}
-                logoUrl={branding.logoUrl}
-                size={56}
-                accentColor={headerSecondary}
-              />
-            </div>
-            <h1 className="mt-4 text-2xl font-bold text-white">{branding.name}</h1>
-            <p className="mt-1 text-sm text-white/70">Merchant Portal</p>
-          </>
-        ) : (
-          <>
-            <Logo size={56} />
-            <h1 className="mt-4 text-2xl font-bold text-white">Rider Tracking</h1>
-            <p className="mt-1 text-sm text-white/50">Merchant Portal</p>
-          </>
-        )}
-        <div className="mx-auto mt-4 h-1 w-12 rounded-full" style={{ backgroundColor: headerSecondary }} />
+    <div
+      className="flex min-h-screen flex-col items-center justify-center bg-[#eef1f6] p-6 text-slate-900"
+      style={
+        {
+          "--merchant-primary": primaryColor,
+          "--merchant-secondary": secondaryColor,
+          "--merchant-accent": secondaryColor,
+        } as React.CSSProperties
+      }
+    >
+      <div className="mb-6 w-full max-w-md animate-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
+        <div className="px-6 py-6 text-center">
+          {branding ? (
+            <>
+              <div className="flex justify-center">
+                <TenantLogo
+                  name={branding.name}
+                  logoUrl={branding.logoUrl}
+                  size={56}
+                  accentColor={secondaryColor}
+                />
+              </div>
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">{branding.name}</h1>
+              <p className="mt-1 text-sm text-slate-500">Merchant portal</p>
+            </>
+          ) : (
+            <>
+              <Logo size={56} />
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">Rider Tracking</h1>
+              <p className="mt-1 text-sm text-slate-500">Merchant portal</p>
+            </>
+          )}
+        </div>
       </div>
 
-      <Card className="w-full max-w-sm animate-scale-in">
-        <h2 className="mb-5 text-lg font-semibold text-white">Sign in to your account</h2>
+      <div className="w-full max-w-md animate-scale-in rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Sign in to your account</h2>
+        <p className="mb-5 text-sm text-slate-500">Enter your merchant ID and password.</p>
+
         {error && (
           <div className="mb-4">
             <StatusBanner tone="danger">{error}</StatusBanner>
           </div>
         )}
+
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Merchant ID
             </label>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                 <UserIcon />
               </span>
-              <Input
+              <MerchantInput
                 type="text"
                 placeholder="MERCHANT001"
                 value={merchantId}
@@ -190,14 +199,14 @@ function MerchantLoginForm() {
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Password
             </label>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                 <LockIcon />
               </span>
-              <Input
+              <MerchantInput
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
@@ -208,22 +217,23 @@ function MerchantLoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 <EyeIcon off={showPassword} />
               </button>
             </div>
           </div>
-          <Button className="w-full" onClick={submit} disabled={loading || !merchantId || !password}>
+          <MerchantButton className="w-full" onClick={submit} disabled={loading || !merchantId || !password}>
             {loading && <Spinner className="h-4 w-4" />}
-            {loading ? "Signing in…" : "Sign In"}
-          </Button>
+            {loading ? "Signing in…" : "Sign in"}
+          </MerchantButton>
         </div>
-        <p className="mt-4 text-center text-xs text-white/40">
+
+        <p className="mt-5 text-center text-xs text-slate-400">
           Merchant accounts are provisioned by Rider Tracking — there is no self-service signup.
         </p>
-      </Card>
+      </div>
     </div>
   );
 }
