@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MerchantButton, MerchantCard } from "@/components/merchant/MerchantUi";
 
 export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null }) {
   const [prefix, setPrefix] = useState(initialPrefix);
@@ -53,8 +52,9 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
   }
 
   async function copyKey() {
-    if (!revealedKey) return;
-    await navigator.clipboard.writeText(revealedKey);
+    const key = revealedKey ?? prefix;
+    if (!key) return;
+    await navigator.clipboard.writeText(revealedKey ?? `${key}…`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -63,65 +63,86 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
     typeof window !== "undefined" ? `${window.location.origin}/api/v1/orders` : "/api/v1/orders";
 
   return (
-    <Card title="API Access">
+    <MerchantCard
+      title="API access"
+      subtitle="Push orders from your site or POS into this dashboard."
+    >
       {error && (
         <div className="mb-4">
           <StatusBanner tone="danger">{error}</StatusBanner>
         </div>
       )}
-      <p className="mb-4 text-sm text-white/50">
-        Send orders from your own site directly into your dashboard by calling this endpoint with
-        your API key.
-      </p>
 
       {revealedKey && (
-        <div className="mb-4 animate-fade-in rounded-lg border border-status-warning/30 bg-status-warning/10 p-3">
-          <p className="mb-2 text-xs font-semibold text-status-warning">
+        <div className="mb-4 animate-fade-in rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 text-xs font-semibold text-amber-800">
             Copy this now — you won&apos;t be able to see it again.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 overflow-x-auto rounded bg-black/30 px-2 py-1.5 text-xs text-white">
+            <code className="flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs text-slate-800">
               {revealedKey}
             </code>
-            <Button variant="accent-outline" onClick={copyKey}>
+            <MerchantButton variant="secondary" onClick={copyKey}>
               {copied ? "Copied!" : "Copy"}
-            </Button>
+            </MerchantButton>
           </div>
         </div>
       )}
 
       {prefix ? (
-        <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Active key</p>
-          <p className="mt-1 font-mono text-sm text-white">{prefix}…</p>
+        <div
+          className="mb-4 rounded-xl p-4"
+          style={{ backgroundColor: "var(--merchant-primary)" }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Active key</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono text-sm text-white">{prefix}…</p>
+            <div className="flex gap-2">
+              <MerchantButton variant="secondary" size="sm" onClick={copyKey}>
+                {copied ? "Copied!" : "Copy"}
+              </MerchantButton>
+              <MerchantButton
+                variant="secondary"
+                size="sm"
+                disabled={busy}
+                onClick={() => setConfirmOpen("generate")}
+              >
+                Regenerate
+              </MerchantButton>
+            </div>
+          </div>
         </div>
       ) : (
-        <p className="mb-4 text-sm text-white/40">No API key generated yet.</p>
+        <p className="mb-4 text-sm text-slate-400">No API key generated yet.</p>
       )}
 
-      <div className="flex gap-3">
-        <Button disabled={busy} onClick={() => setConfirmOpen("generate")}>
+      {!prefix ? (
+        <MerchantButton disabled={busy} onClick={() => setConfirmOpen("generate")}>
           {busy && <Spinner className="h-4 w-4" />}
-          {prefix ? "Regenerate Key" : "Generate API Key"}
-        </Button>
-        {prefix && (
-          <Button variant="accent-outline" disabled={busy} onClick={() => setConfirmOpen("revoke")}>
-            Revoke
-          </Button>
-        )}
-      </div>
-
-      {prefix && (
-        <details className="mt-4 text-sm text-white/50">
-          <summary className="cursor-pointer text-white/70">How to use it</summary>
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-black/30 p-3 text-xs text-white/80">
-            {`curl -X POST ${endpoint} -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d "{\\"customer_name\\": \\"Fatima Zahra\\", \\"customer_phone\\": \\"03001234567\\", \\"delivery_address\\": \\"House 12, Block 13-D2, Gulshan-e-Iqbal, Karachi\\"}"`}
-          </pre>
-          <p className="mt-1 text-xs text-white/40">
-            One line, ready to paste directly into Command Prompt, PowerShell, or a terminal.
-          </p>
-        </details>
+          Generate API key
+        </MerchantButton>
+      ) : (
+        <MerchantButton variant="ghost" disabled={busy} onClick={() => setConfirmOpen("revoke")}>
+          Revoke key
+        </MerchantButton>
       )}
+
+      <div className="mt-5 rounded-xl bg-slate-50 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Example request
+        </p>
+        <pre className="overflow-x-auto text-xs leading-relaxed text-slate-700">
+          {`POST ${endpoint}
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+{
+  "customer_name": "Fatima Zahra",
+  "customer_phone": "03001234567",
+  "delivery_address": "House 12, Block 13-D2, Gulshan-e-Iqbal, Karachi"
+}`}
+        </pre>
+      </div>
 
       <ConfirmDialog
         open={confirmOpen === "generate"}
@@ -145,6 +166,6 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
         onConfirm={revoke}
         onCancel={() => setConfirmOpen(null)}
       />
-    </Card>
+    </MerchantCard>
   );
 }

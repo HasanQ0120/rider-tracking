@@ -84,6 +84,8 @@ export function OrderDetail({
   backHref = "/ops/orders",
   showCancelAction = true,
   showResetSessionAction = true,
+  showRiderLinks = true,
+  merchantMode = false,
 }: {
   order: Order;
   orderRank: number;
@@ -105,9 +107,14 @@ export function OrderDetail({
   backHref?: string;
   showCancelAction?: boolean;
   showResetSessionAction?: boolean;
+  /** SaaS merchant dashboard — customer tracking URL only, no rider web links. */
+  showRiderLinks?: boolean;
+  merchantMode?: boolean;
 }) {
   const router = useRouter();
-  const [selectedRider, setSelectedRider] = useState(riders[0]?.id ?? "");
+  const [selectedRider, setSelectedRider] = useState(
+    order.assigned_rider_id ?? riders[0]?.id ?? ""
+  );
   const [needsConfirm, setNeedsConfirm] = useState(false);
   // Tracks exactly which action is in flight, not just whether *something*
   // is -- so only the button actually clicked shows its own spinner while
@@ -145,8 +152,12 @@ export function OrderDetail({
     }
     setNeedsConfirm(false);
     if (data.status === "ok") {
-      if (data.pin) setAssignedPin(data.pin);
-      setMessage("Rider assigned. Links sent.");
+      if (data.pin && showRiderLinks) setAssignedPin(data.pin);
+      setMessage(
+        merchantMode
+          ? "Rider assigned — they will see this order in the Rider app. Send the customer tracking URL below."
+          : "Rider assigned. Links sent."
+      );
       router.refresh();
     } else {
       setMessage(`Failed: ${data.status}`);
@@ -180,19 +191,36 @@ export function OrderDetail({
 
   const timeline = buildTimeline(order);
 
+  const shellCls = merchantMode
+    ? "rounded-2xl border border-slate-200 bg-[#0b1220] p-6 shadow-sm md:p-8"
+    : "animate-slide-up space-y-6";
+
+  const sectionCls = merchantMode
+    ? "rounded-xl border border-white/10 bg-white/[0.03] p-5"
+    : "";
+
+  const labelCls = merchantMode ? "text-xs uppercase tracking-wide text-white/40" : "text-xs uppercase tracking-wide text-white/40";
+  const valueCls = merchantMode ? "text-white" : "text-white";
+
   return (
-    <div className="animate-slide-up space-y-6">
-      <div className="flex items-center gap-3">
+    <div className={shellCls}>
+      <div className={`${merchantMode ? "mb-6" : ""} flex items-center gap-3`}>
         <Link
           href={backHref}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+            merchantMode
+              ? "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          }`}
           aria-label="Back to Orders"
         >
           ←
         </Link>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-mono text-lg font-semibold text-white">{formatOrderCode(orderRank)}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-mono text-xl font-semibold text-white md:text-2xl">
+              {formatOrderCode(orderRank)}
+            </h1>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${orderStatusBadgeClasses(order.status)}`}
             >
@@ -204,7 +232,7 @@ export function OrderDetail({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className={merchantMode ? "mb-6 space-y-2" : "space-y-2"}>
         {order.tracking_expired_unresolved && (
           <StatusBanner tone="warning">Tracking link expired on this still-open order.</StatusBanner>
         )}
@@ -230,31 +258,53 @@ export function OrderDetail({
         {message && <StatusBanner tone="success">{message}</StatusBanner>}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className={`grid grid-cols-1 gap-6 ${merchantMode ? "lg:grid-cols-[1fr_280px]" : "lg:grid-cols-3"}`}>
+        <div className={`space-y-6 ${merchantMode ? "" : "lg:col-span-2"}`}>
+          {merchantMode ? (
+            <div className={sectionCls}>
+              <h2 className="mb-4 font-semibold text-white">Customer Details</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <p className={labelCls}>Name</p>
+                  <p className={`mt-1 ${valueCls}`}>{order.customer_name}</p>
+                </div>
+                <div>
+                  <p className={labelCls}>Phone</p>
+                  <p className={`mt-1 ${valueCls}`}>{order.customer_phone}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className={labelCls}>Delivery Address</p>
+                  <p className={`mt-1 ${valueCls}`}>{order.delivery_address}</p>
+                  {order.address_detail ? (
+                    <p className="mt-1 text-sm text-white/60">{order.address_detail}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : (
           <Card title="Customer Details">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-white/40">Name</p>
-                <p className="text-white">{order.customer_name}</p>
+                <p className={labelCls}>Name</p>
+                <p className={valueCls}>{order.customer_name}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-white/40">Phone</p>
-                <p className="text-white">{order.customer_phone}</p>
+                <p className={labelCls}>Phone</p>
+                <p className={valueCls}>{order.customer_phone}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs uppercase tracking-wide text-white/40">Delivery Address</p>
-                <p className="text-white">{order.delivery_address}</p>
+                <p className={labelCls}>Delivery Address</p>
+                <p className={valueCls}>{order.delivery_address}</p>
               </div>
               {order.address_detail && (
                 <div className="col-span-2">
-                  <p className="text-xs uppercase tracking-wide text-white/40">Plot / Floor Details</p>
-                  <p className="text-white">{order.address_detail}</p>
+                  <p className={labelCls}>Plot / Floor Details</p>
+                  <p className={valueCls}>{order.address_detail}</p>
                 </div>
               )}
               {order.delivery_lat != null && order.delivery_lng != null && (
                 <div className="col-span-2">
-                  <p className="text-xs uppercase tracking-wide text-white/40">Coordinates</p>
+                  <p className={labelCls}>Coordinates</p>
                   <p className="font-mono text-sm text-brand-gold/80">
                     {order.delivery_lat.toFixed(6)}, {order.delivery_lng.toFixed(6)}
                   </p>
@@ -262,11 +312,63 @@ export function OrderDetail({
               )}
             </div>
           </Card>
+          )}
 
           {order.status !== "delivered" &&
             order.status !== "cancelled" &&
             order.status !== "pending_confirmation" &&
-            order.status !== "flagged_review" && (
+            order.status !== "flagged_review" &&
+            (merchantMode ? (
+              <div className={sectionCls}>
+                <h2 className="mb-4 font-semibold text-white">Assign Rider</h2>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Select
+                    className="flex-1"
+                    value={selectedRider}
+                    onChange={(e) => setSelectedRider(e.target.value)}
+                  >
+                    <option value="">Select a rider…</option>
+                    {riders.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} — {r.phone}
+                      </option>
+                    ))}
+                  </Select>
+                  <button
+                    type="button"
+                    onClick={() => assign(false)}
+                    disabled={busy || !selectedRider}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#0b1220] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
+                  >
+                    {busyAction === "assign" && <Spinner className="h-4 w-4" />}
+                    {busyAction === "assign"
+                      ? "Assigning…"
+                      : order.assigned_rider_id
+                        ? "Reassign"
+                        : "Assign"}
+                  </button>
+                </div>
+                {needsConfirm && (
+                  <div className="mt-3 animate-scale-in space-y-2">
+                    <StatusBanner tone="warning">
+                      This order already has a rider assigned. Confirm to reassign — the previous
+                      rider will lose access in the Rider app.
+                    </StatusBanner>
+                    <button
+                      type="button"
+                      onClick={() => assign(true)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#0b1220] disabled:opacity-40"
+                      style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
+                    >
+                      {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
+                      {busyAction === "reassign" ? "Reassigning…" : "Confirm Reassignment"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
             <Card title="Assign Rider">
               <div className="flex gap-2">
                 <Select
@@ -293,8 +395,7 @@ export function OrderDetail({
               {needsConfirm && (
                 <div className="mt-3 animate-scale-in space-y-2">
                   <StatusBanner tone="warning">
-                    This order already has an active rider. Confirm to reassign — the current
-                    rider&apos;s link will be revoked immediately.
+                    This order already has an active rider. Confirm to reassign — the current rider&apos;s link will be revoked immediately.
                   </StatusBanner>
                   <Button onClick={() => assign(true)} disabled={busy}>
                     {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
@@ -303,12 +404,47 @@ export function OrderDetail({
                 </div>
               )}
             </Card>
-          )}
+            ))}
 
-          {(activeRiderToken || activeCustomerToken) && (
-            <Card title="Active Links" className="animate-fade-in">
+          {((showRiderLinks && activeRiderToken) || activeCustomerToken) &&
+            (merchantMode && activeCustomerToken ? (
+              <div className={sectionCls}>
+                <h2 className="mb-2 font-semibold text-white">Customer Tracking URL</h2>
+                <p className="mb-4 text-sm text-white/60">
+                  Send this link to your customer via SMS, WhatsApp, or email so they can track the
+                  delivery live.
+                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-white/80">
+                    Tracking URL{" "}
+                    <span className="text-xs text-white/40">No PIN required</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/5"
+                      >
+                        Open
+                      </button>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => copyLink("customer", `${origin}/customer/${activeCustomerToken.token}`)}
+                      className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/5"
+                    >
+                      {copied === "customer" ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : !merchantMode ? (
+            <Card
+              title="Active Links"
+              className="animate-fade-in"
+            >
               <div className="space-y-3">
-                {activeRiderToken && (
+                {showRiderLinks && activeRiderToken && (
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="min-w-0 flex-1 truncate text-sm text-white/70">
@@ -335,7 +471,8 @@ export function OrderDetail({
                 {activeCustomerToken && (
                   <div className="flex items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm text-white/70">
-                      Customer Link <span className="text-xs text-white/40">No PIN required</span>
+                      Customer Link{" "}
+                      <span className="text-xs text-white/40">No PIN required</span>
                     </p>
                     <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
                       <Button variant="accent-outline" size="sm">
@@ -353,7 +490,7 @@ export function OrderDetail({
                 )}
               </div>
             </Card>
-          )}
+            ) : null)}
 
           {showResetSessionAction && activeRiderToken && (
             <Card title="Device Swap" className="animate-fade-in">
@@ -384,6 +521,36 @@ export function OrderDetail({
         </div>
 
         <div>
+          {merchantMode ? (
+            <div className={`${sectionCls} h-full`}>
+              <h2 className="mb-4 font-semibold text-white">Status History</h2>
+              <ol className="space-y-5">
+                {timeline.map((event, i) => {
+                  const isCurrent = i === timeline.length - 1;
+                  return (
+                    <li key={`${event.label}-${event.at}`} className="flex gap-3">
+                      <span className="relative mt-1 flex h-3 w-3 shrink-0 items-center justify-center">
+                        {isCurrent ? (
+                          <span
+                            className="h-2.5 w-2.5 rotate-45"
+                            style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
+                          />
+                        ) : (
+                          <span className="h-2 w-2 rounded-full bg-white/25" />
+                        )}
+                      </span>
+                      <div>
+                        <p className={`text-sm font-medium ${isCurrent ? "text-white" : "text-white/70"}`}>
+                          {event.label}
+                        </p>
+                        <p className="text-xs text-white/40">{formatTimestamp(event.at)}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ) : (
           <Card title="Status History">
             <ol className="space-y-4">
               {timeline.map((event, i) => (
@@ -401,6 +568,7 @@ export function OrderDetail({
               ))}
             </ol>
           </Card>
+          )}
         </div>
       </div>
     </div>

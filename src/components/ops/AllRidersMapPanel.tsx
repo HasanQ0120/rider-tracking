@@ -45,11 +45,13 @@ export function AllRidersMapPanel({
   endpointBase,
   onClose,
   onSelectRider,
+  variant = "dark",
 }: {
   riders: { id: string; name: string }[];
   endpointBase: string;
-  onClose: () => void;
+  onClose?: () => void;
   onSelectRider: (riderId: string) => void;
+  variant?: "dark" | "light";
 }) {
   const [snapshots, setSnapshots] = useState<Record<string, Snapshot> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -103,17 +105,36 @@ export function AllRidersMapPanel({
   });
   const markers = spreadOverlappingMarkers(rawMarkers);
 
+  const isLight = variant === "light";
+
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-surface-raised">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <p className="font-medium text-white">All Riders</p>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-        >
-          ×
-        </button>
+    <div
+      className={`flex h-full flex-col overflow-hidden rounded-xl border ${
+        isLight ? "border-slate-200 bg-white" : "border-white/10 bg-surface-raised"
+      }`}
+    >
+      <div
+        className={`flex items-center justify-between border-b px-4 py-3 ${
+          isLight ? "border-slate-100" : "border-white/10"
+        }`}
+      >
+        <div>
+          <p className={`font-medium ${isLight ? "text-slate-900" : "text-white"}`}>Live map</p>
+          <p className={`text-xs ${isLight ? "text-slate-500" : "text-white/50"}`}>auto-refresh 10s</p>
+        </div>
+        {onClose ? (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+              isLight
+                ? "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                : "text-white/50 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            ×
+          </button>
+        ) : null}
       </div>
       <div className="relative flex-1">
         {!snapshots ? (

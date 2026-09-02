@@ -7,8 +7,21 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
+import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { Logo } from "@/components/ui/Logo";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import {
+  DEFAULT_MERCHANT_PRIMARY,
+  DEFAULT_MERCHANT_SECONDARY,
+  normalizeHexColor,
+} from "@/lib/merchant/branding";
+
+type LoginBranding = {
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+};
 
 function UserIcon() {
   return (
@@ -43,9 +56,6 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
-// Merchants only ever see "Merchant ID" -- Supabase Auth needs an
-// email-shaped identity under the hood, so the public merchant_id is
-// mapped to this fixed synthetic domain, invisible in the UI.
 function merchantIdToEmail(merchantId: string) {
   return `${merchantId.trim().toLowerCase()}@merchants.internal`;
 }
@@ -58,12 +68,46 @@ function MerchantLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [branding, setBranding] = useState<LoginBranding | null>(null);
 
   useEffect(() => {
     if (searchParams.get("error") === "not_authorized") {
       setError("This account isn't provisioned for merchant access, or has been deactivated.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const id = merchantId.trim();
+    if (!id || id.length < 3) {
+      setBranding(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/public/tenant-branding?merchant_id=${encodeURIComponent(id)}`);
+        if (!res.ok) {
+          setBranding(null);
+          return;
+        }
+        const data = await res.json();
+        if (data.status !== "ok") {
+          setBranding(null);
+          return;
+        }
+        setBranding({
+          name: data.name,
+          logoUrl: data.branding.logo_url,
+          primaryColor: normalizeHexColor(data.branding.primary_color, DEFAULT_MERCHANT_PRIMARY),
+          secondaryColor: normalizeHexColor(data.branding.secondary_color, DEFAULT_MERCHANT_SECONDARY),
+        });
+      } catch {
+        setBranding(null);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [merchantId]);
 
   async function submit() {
     setLoading(true);
@@ -87,12 +131,36 @@ function MerchantLoginForm() {
     }
   }
 
+  const headerPrimary = branding?.primaryColor ?? DEFAULT_MERCHANT_PRIMARY;
+  const headerSecondary = branding?.secondaryColor ?? DEFAULT_MERCHANT_SECONDARY;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface p-6">
-      <div className="mb-8 flex flex-col items-center text-center animate-slide-up">
-        <Logo size={56} />
-        <h1 className="mt-4 text-2xl font-bold text-white">Rider Tracking</h1>
-        <p className="mt-1 text-sm text-white/50">Merchant Portal</p>
+      <div
+        className="mb-8 w-full max-w-sm rounded-xl border border-white/10 px-6 py-5 text-center animate-slide-up"
+        style={{ backgroundColor: headerPrimary }}
+      >
+        {branding ? (
+          <>
+            <div className="flex justify-center">
+              <TenantLogo
+                name={branding.name}
+                logoUrl={branding.logoUrl}
+                size={56}
+                accentColor={headerSecondary}
+              />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold text-white">{branding.name}</h1>
+            <p className="mt-1 text-sm text-white/70">Merchant Portal</p>
+          </>
+        ) : (
+          <>
+            <Logo size={56} />
+            <h1 className="mt-4 text-2xl font-bold text-white">Rider Tracking</h1>
+            <p className="mt-1 text-sm text-white/50">Merchant Portal</p>
+          </>
+        )}
+        <div className="mx-auto mt-4 h-1 w-12 rounded-full" style={{ backgroundColor: headerSecondary }} />
       </div>
 
       <Card className="w-full max-w-sm animate-scale-in">

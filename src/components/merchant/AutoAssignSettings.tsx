@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { MerchantCard, MerchantInput } from "@/components/merchant/MerchantUi";
+import { MerchantSelect } from "@/components/merchant/MerchantUi";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap } from "@/components/map/TrackingMap";
@@ -165,18 +164,18 @@ export function AutoAssignSettings({
     <div className="space-y-6">
       {error && <StatusBanner tone="danger">{error}</StatusBanner>}
 
-      <Card title="Pickup Location">
-        <p className="mb-3 text-sm text-white/50">
+      <MerchantCard title="Pickup location" id="pickup-location" subtitle="Center point for automatic rider assignment.">
+        <p className="mb-3 text-sm text-slate-500 sr-only">
           Where riders pick up orders from. Used as the center point for automatic rider
           assignment.
         </p>
         {hasPickup && (
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/40">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Current
               </p>
-              <p className="mt-1 text-sm text-white">{pickupAddress}</p>
+              <p className="mt-1 text-sm text-slate-900">{pickupAddress}</p>
             </div>
             <Button
               variant="accent-outline"
@@ -203,7 +202,7 @@ export function AutoAssignSettings({
         {showPickupSearch && (
           <div className="animate-fade-in space-y-3">
             <div className="flex gap-2">
-              <Input
+              <MerchantInput
                 placeholder="Search address…"
                 value={addressQuery}
                 onChange={(e) => setAddressQuery(e.target.value)}
@@ -225,7 +224,7 @@ export function AutoAssignSettings({
             )}
 
             {candidates.length > 1 && (
-              <Select
+              <MerchantSelect
                 value={selected ? candidateKey(selected) : ""}
                 onChange={(e) =>
                   setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
@@ -236,12 +235,12 @@ export function AutoAssignSettings({
                     {c.placeName}
                   </option>
                 ))}
-              </Select>
+              </MerchantSelect>
             )}
 
             {selected && (
               <div className="space-y-2">
-                <div className="h-64 overflow-hidden rounded-xl border border-white/10 shadow-sm">
+                <div className="h-64 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
                   <TrackingMap
                     markers={[{ id: "pin", lat: selected.lat, lng: selected.lng, color: "#FFD700", draggable: true }]}
                     defaultCenter={[selected.lat, selected.lng]}
@@ -249,7 +248,7 @@ export function AutoAssignSettings({
                     onMarkerDrag={handlePinDrag}
                   />
                 </div>
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-slate-500">
                   📍 {selected.lat.toFixed(6)}, {selected.lng.toFixed(6)} — click the map or drag the
                   pin if this isn't the exact spot.
                 </p>
@@ -261,7 +260,7 @@ export function AutoAssignSettings({
             )}
 
             {!selected && (
-              <div className="h-64 overflow-hidden rounded-xl border border-white/10 shadow-sm">
+              <div className="h-64 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
                 <TrackingMap
                   markers={[]}
                   defaultCenter={DEFAULT_MAP_CENTER}
@@ -271,10 +270,10 @@ export function AutoAssignSettings({
             )}
           </div>
         )}
-      </Card>
+      </MerchantCard>
 
-      <Card title="Automatic Assignment">
-        <p className="mb-4 text-sm text-white/50">
+      <MerchantCard title="Automatic assignment" id="automatic-assignment" subtitle="Assign new orders to the nearest available rider automatically.">
+        <p className="mb-4 text-sm text-slate-500 sr-only">
           When on, new orders are automatically assigned to whichever available rider is nearest
           your pickup location and carrying the fewest active deliveries, instead of assigning
           manually.
@@ -284,16 +283,16 @@ export function AutoAssignSettings({
           disabled={togglingAutoAssign}
           className={`flex w-full items-center justify-between rounded-lg border p-3 transition-colors disabled:opacity-50 ${
             autoAssignEnabled
-              ? "border-status-success/30 bg-status-success/10"
-              : "border-white/10 bg-white/5"
+              ? "border-emerald-200 bg-emerald-50"
+              : "border-slate-200 bg-slate-50"
           }`}
         >
-          <span className="text-sm font-medium text-white">
+          <span className="text-sm font-medium text-slate-900">
             {autoAssignEnabled ? "On" : "Off"}
           </span>
           <span
             className={`relative h-6 w-11 rounded-full transition-colors ${
-              autoAssignEnabled ? "bg-status-success" : "bg-white/20"
+              autoAssignEnabled ? "bg-emerald-500" : "bg-slate-300"
             }`}
           >
             <span
@@ -304,9 +303,9 @@ export function AutoAssignSettings({
           </span>
         </button>
         {!hasPickup && !autoAssignEnabled && (
-          <p className="mt-2 text-xs text-white/40">Set a pickup location above first.</p>
+          <p className="mt-2 text-xs text-slate-500">Set a pickup location above first.</p>
         )}
-      </Card>
+      </MerchantCard>
     </div>
   );
 }

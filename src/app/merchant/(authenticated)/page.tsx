@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
 import { createAuthServerClient } from "@/lib/supabase/serverAuth";
-import { Button } from "@/components/ui/Button";
+import { MerchantContentCard, MerchantPageHeader } from "@/components/merchant/MerchantUi";
 import { OrdersTable } from "@/components/ops/OrdersTable";
 
 export default async function MerchantOrdersPage() {
   await requireMerchantUser();
-  // Authenticated (anon key + this merchant's session JWT) client, NOT
-  // service-role -- RLS's tenant_id policy is what actually scopes this
-  // query to the merchant's own rows.
   const supabase = await createAuthServerClient();
   const { data: orders } = await supabase
     .from("orders")
@@ -17,15 +14,40 @@ export default async function MerchantOrdersPage() {
     )
     .order("created_at", { ascending: false });
 
+  const list = orders ?? [];
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const todayCount = list.filter((o) => new Date(o.created_at) >= startOfDay).length;
+  const flaggedCount = list.filter((o) => o.status === "flagged_review").length;
+
   return (
-    <div className="animate-slide-up">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-white">Orders</h1>
-        <Link href="/merchant/orders/new">
-          <Button>+ New Order</Button>
-        </Link>
-      </div>
-      <OrdersTable orders={orders ?? []} orderBasePath="/merchant/orders" />
-    </div>
+    <>
+      <MerchantPageHeader
+        title="Orders"
+        subtitle={
+          <>
+            {todayCount} order{todayCount === 1 ? "" : "s"} today
+            {flaggedCount > 0 ? (
+              <>
+                {" "}
+                · {flaggedCount} flagged for review
+              </>
+            ) : null}
+          </>
+        }
+        actions={
+          <Link
+            href="/merchant/settings"
+            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            API integration
+          </Link>
+        }
+      />
+
+      <MerchantContentCard>
+        <OrdersTable orders={list} orderBasePath="/merchant/orders" variant="light" />
+      </MerchantContentCard>
+    </>
   );
 }

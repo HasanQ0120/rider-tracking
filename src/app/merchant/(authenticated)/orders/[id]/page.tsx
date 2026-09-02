@@ -11,9 +11,6 @@ export default async function MerchantOrderDetailPage({
 }) {
   await requireMerchantUser();
   const { id } = await params;
-  // RLS-authenticated client -- the "merchant reads own orders" policy is
-  // what actually proves this order belongs to this merchant's tenant, not
-  // just an .eq('tenant_id', ...) that a bug could someday drop.
   const supabase = await createAuthServerClient();
 
   const { data: order } = await supabase
@@ -37,10 +34,6 @@ export default async function MerchantOrderDetailPage({
     .eq("active", true)
     .order("name");
 
-  // tracking_tokens has no merchant RLS policy (service-role-only
-  // resource) -- safe to read via service-role here specifically because
-  // `order` was only reachable above through the RLS-authenticated client,
-  // which already proved it belongs to this merchant's own tenant.
   const service = createServiceClient();
   const { data: tokens } = await service
     .from("tracking_tokens")
@@ -48,31 +41,18 @@ export default async function MerchantOrderDetailPage({
     .eq("order_id", id)
     .order("created_at", { ascending: false });
 
-  // Only ever non-null while no real SMS provider is connected (see
-  // pin_plain / isTestNotificationProvider in src/lib/assignRider.ts) --
-  // gives the merchant a persistent way to see the PIN instead of the
-  // one-time assign-response toast, which auto-assigned orders never
-  // showed at all.
-  const activeRiderTokenId = tokens?.find((t) => t.type === "rider" && t.active)?.id;
-  const { data: pinCode } = activeRiderTokenId
-    ? await service
-        .from("pin_codes")
-        .select("pin_plain")
-        .eq("rider_token_id", activeRiderTokenId)
-        .maybeSingle()
-    : { data: null };
-
   return (
     <OrderDetail
       order={order}
       orderRank={orderRank ?? 1}
       tokens={tokens ?? []}
       riders={riders ?? []}
-      pin={pinCode?.pin_plain ?? null}
       assignEndpoint={`/api/merchant/orders/${id}/assign`}
       backHref="/merchant"
       showCancelAction={false}
       showResetSessionAction={false}
+      showRiderLinks={false}
+      merchantMode
     />
   );
 }

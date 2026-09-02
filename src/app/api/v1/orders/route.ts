@@ -4,6 +4,8 @@ import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
 import { runAutoAssignment } from "@/lib/autoAssign";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
 import { geocodeAddress } from "@/lib/geocode";
+import { customerTrackingUrl } from "@/lib/appUrl";
+import { getCustomerTrackingUrlForOrder } from "@/lib/trackingTokens";
 
 // The one genuinely public-facing, credential-only endpoint in the app --
 // a merchant's own backend calls this directly, no browser session
@@ -109,9 +111,14 @@ export async function POST(req: Request) {
 
   const { data: finalOrder } = await service.from("orders").select().eq("id", order.id).single();
 
+  const customerTrackingUrlValue = assignment?.customerTrackingToken
+    ? customerTrackingUrl(assignment.customerTrackingToken)
+    : await getCustomerTrackingUrlForOrder(service, order.id);
+
   return NextResponse.json({
     status: "ok",
     order: finalOrder ?? order,
     assignedRider: assignment ? { id: assignment.riderId, name: assignment.riderName } : null,
+    customer_tracking_url: customerTrackingUrlValue,
   });
 }

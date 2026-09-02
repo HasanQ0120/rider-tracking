@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireOpsUserApi } from "@/lib/ops/authGuardApi";
 import { performRiderAssignment } from "@/lib/assignRider";
+import { customerTrackingUrl } from "@/lib/appUrl";
+import { getActiveCustomerToken } from "@/lib/trackingTokens";
 
 export async function POST(
   req: Request,
@@ -47,9 +49,8 @@ export async function POST(
     return NextResponse.json({ status: "needs_confirmation" }, { status: 409 });
   }
 
-  let pin: string | null;
   try {
-    pin = await performRiderAssignment(supabase, {
+    const result = await performRiderAssignment(supabase, {
       orderId,
       riderId,
       riderPhone: rider.phone,
@@ -57,12 +58,16 @@ export async function POST(
       customerName: order.customer_name,
       isReassignment,
     });
+
+    const customerToken =
+      result.customerTrackingToken ?? (await getActiveCustomerToken(supabase, orderId));
+
+    return NextResponse.json({
+      status: "ok",
+      pin: result.pin ?? undefined,
+      customer_tracking_url: customerToken ? customerTrackingUrl(customerToken) : null,
+    });
   } catch {
     return NextResponse.json({ status: "error" }, { status: 500 });
   }
-
-  return NextResponse.json({
-    status: "ok",
-    pin: pin ?? undefined,
-  });
 }

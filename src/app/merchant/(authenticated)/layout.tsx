@@ -1,31 +1,16 @@
-import Link from "next/link";
-import { MerchantNav } from "@/components/merchant/MerchantNav";
-import { MerchantLogoutButton } from "@/components/merchant/MerchantLogoutButton";
-import { Logo } from "@/components/ui/Logo";
-import { ViewBadge } from "@/components/ui/ViewBadge";
+import { MerchantDashboardShell } from "@/components/merchant/MerchantDashboardShell";
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
 
 export default async function MerchantLayout({ children }: { children: React.ReactNode }) {
   const merchant = await requireMerchantUser();
+
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="flex items-center justify-between border-b border-white/10 bg-[#070a12] px-6 py-3 text-white shadow-sm">
-        <Link href="/merchant" className="flex items-center gap-2.5">
-          <Logo size={32} />
-          <span className="flex items-baseline gap-1.5">
-            <span className="font-semibold tracking-wide">{merchant.name}</span>
-            <span className="text-xs text-white/50">{merchant.merchantId}</span>
-          </span>
-        </Link>
-        <nav className="flex items-center gap-1">
-          <MerchantNav />
-        </nav>
-        <div className="flex items-center gap-3">
-          <ViewBadge label="Merchant View" />
-          <MerchantLogoutButton />
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl p-6">{children}</main>
-    </div>
+    <MerchantDashboardShell
+      merchantName={merchant.name}
+      merchantId={merchant.merchantId}
+      branding={merchant.branding}
+    >
+      {children}
+    </MerchantDashboardShell>
   );
 }

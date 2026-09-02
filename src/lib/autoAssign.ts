@@ -189,7 +189,7 @@ export async function runAutoAssignment(
     .single();
   if (!rider) return null;
 
-  await performRiderAssignment(supabase, {
+  const result = await performRiderAssignment(supabase, {
     orderId,
     riderId,
     riderPhone: rider.phone,
@@ -198,5 +198,10 @@ export async function runAutoAssignment(
     isReassignment: false,
   });
 
-  return { riderId, riderName: rider.name, riderPhone: rider.phone };
+  return {
+    riderId,
+    riderName: rider.name,
+    riderPhone: rider.phone,
+    customerTrackingToken: result.customerTrackingToken,
+  };
 }

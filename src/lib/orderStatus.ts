@@ -28,8 +28,20 @@ export const ORDER_STATUS_BADGE_CLASSES: Record<string, string> = {
   flagged_review: "bg-status-danger/15 text-status-danger",
 };
 
-export function orderStatusBadgeClasses(status: string): string {
-  return ORDER_STATUS_BADGE_CLASSES[status] ?? "bg-white/10 text-white/70";
+export const ORDER_STATUS_BADGE_CLASSES_LIGHT: Record<string, string> = {
+  pending: "bg-slate-100 text-slate-600",
+  assigned: "bg-blue-50 text-blue-700",
+  in_transit: "bg-amber-50 text-amber-700",
+  arrived: "bg-teal-50 text-teal-700",
+  pending_confirmation: "bg-amber-50 text-amber-700",
+  delivered: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-red-50 text-red-700",
+  flagged_review: "bg-red-50 text-red-700",
+};
+
+export function orderStatusBadgeClasses(status: string, light = false): string {
+  const map = light ? ORDER_STATUS_BADGE_CLASSES_LIGHT : ORDER_STATUS_BADGE_CLASSES;
+  return map[status] ?? (light ? "bg-slate-100 text-slate-600" : "bg-white/10 text-white/70");
 }
 
 // Filter tabs on the Orders list -- "all" isn't a real status value, just

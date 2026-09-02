@@ -1,5 +1,6 @@
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
 import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { MerchantPageHeader } from "@/components/merchant/MerchantUi";
 import { RidersPanel } from "@/components/ops/RidersPanel";
 
 export default async function MerchantRidersPage() {
@@ -27,14 +28,30 @@ export default async function MerchantRidersPage() {
     activeCount: counts.get(r.id)?.active ?? 0,
   }));
 
+  const onDelivery = ridersWithCounts.filter((r) => (r.activeCount ?? 0) > 0).length;
+  const accepting = ridersWithCounts.filter((r) => r.available).length;
+
   return (
-    <div className="mx-auto max-w-2xl animate-slide-up">
-      <RidersPanel
-        initialRiders={ridersWithCounts}
-        createEndpoint="/api/merchant/riders"
-        bulkImportEndpoint="/api/merchant/riders/bulk"
-        locationEndpointBase="/api/merchant/riders"
+    <>
+      <MerchantPageHeader
+        title="Riders"
+        subtitle={
+          <>
+            {ridersWithCounts.length} registered · {accepting} accepting orders · {onDelivery} on
+            delivery right now
+          </>
+        }
       />
-    </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <RidersPanel
+          initialRiders={ridersWithCounts}
+          createEndpoint="/api/merchant/riders"
+          bulkImportEndpoint="/api/merchant/riders/bulk"
+          locationEndpointBase="/api/merchant/riders"
+          variant="light"
+        />
+      </div>
+    </>
   );
 }

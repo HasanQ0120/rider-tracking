@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireMerchantUserApi } from "@/lib/merchant/authGuardApi";
 import { performRiderAssignment } from "@/lib/assignRider";
+import { customerTrackingUrl } from "@/lib/appUrl";
+import { getActiveCustomerToken } from "@/lib/trackingTokens";
 
 export async function POST(
   req: Request,
@@ -16,13 +18,6 @@ export async function POST(
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
 
-  // Service-role for the actual write (performRiderAssignment needs
-  // tracking_tokens/pin_codes writes the merchant's own RLS grants don't
-  // cover) -- which is exactly why the two tenant_id checks below are not
-  // optional. Unlike ops (intentionally cross-tenant), a merchant session
-  // must never be able to assign its own rider to another tenant's order,
-  // or another tenant's rider to its own order -- RLS doesn't guard this
-  // path (it's service-role), so the application code is the enforcement.
   const supabase = createServiceClient();
   const { data: order } = await supabase
     .from("orders")
@@ -51,9 +46,8 @@ export async function POST(
     return NextResponse.json({ status: "needs_confirmation" }, { status: 409 });
   }
 
-  let pin: string | null;
   try {
-    pin = await performRiderAssignment(supabase, {
+    const result = await performRiderAssignment(supabase, {
       orderId,
       riderId,
       riderPhone: rider.phone,
@@ -61,12 +55,15 @@ export async function POST(
       customerName: order.customer_name,
       isReassignment,
     });
+
+    const customerToken =
+      result.customerTrackingToken ?? (await getActiveCustomerToken(supabase, orderId));
+
+    return NextResponse.json({
+      status: "ok",
+      customer_tracking_url: customerToken ? customerTrackingUrl(customerToken) : null,
+    });
   } catch {
     return NextResponse.json({ status: "error" }, { status: 500 });
   }
-
-  return NextResponse.json({
-    status: "ok",
-    pin: pin ?? undefined,
-  });
 }

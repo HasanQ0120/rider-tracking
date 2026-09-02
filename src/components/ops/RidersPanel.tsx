@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { MerchantCard, MerchantInput, MerchantButton } from "@/components/merchant/MerchantUi";
+import { useMerchantSearch } from "@/components/merchant/MerchantSearchContext";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { RiderLocationPanel } from "@/components/ops/RiderLocationPanel";
@@ -31,26 +33,42 @@ type MapMode = { kind: "closed" } | { kind: "all" } | { kind: "single"; riderId:
 
 // Avatar + name/phone/plate -- shared between each list row and the
 // single-rider detail card so the two views never drift out of sync.
-function RiderInfo({ r }: { r: Rider }) {
+function RiderInfo({ r, light }: { r: Rider; light?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-brand-navy text-sm font-semibold text-white">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+          light
+            ? "border border-slate-200 bg-slate-100 text-slate-700"
+            : "border border-white/10 bg-brand-navy text-white"
+        }`}
+      >
         {r.name.charAt(0).toUpperCase()}
       </div>
       <div>
-        <p className="font-medium text-white">{r.name}</p>
-        <p className="text-xs text-white/50">
+        <p className={`font-medium ${light ? "text-slate-900" : "text-white"}`}>{r.name}</p>
+        <p className={`text-xs ${light ? "text-slate-500" : "text-white/50"}`}>
           {r.phone}
-          {r.license_plate && <span className="ml-2 font-mono text-brand-gold/80">{r.license_plate}</span>}
+          {r.license_plate && (
+            <span className={`ml-2 font-mono ${light ? "text-slate-600" : "text-brand-gold/80"}`}>
+              {r.license_plate}
+            </span>
+          )}
         </p>
       </div>
     </div>
   );
 }
 
-// Idle/active + accepting-orders status -- also shared between the list
-// row and the detail card.
-function RiderBadges({ r }: { r: Rider }) {
+function RiderBadges({ r, light }: { r: Rider; light?: boolean }) {
+  const idleCls = light
+    ? "bg-slate-100 text-slate-600"
+    : "bg-white/10 text-white/50";
+  const mutedCls = light ? "text-slate-500" : "text-white/40";
+  const notAcceptingCls = light
+    ? "bg-slate-100 text-slate-500"
+    : "bg-white/10 text-white/40";
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {!r.active && (
@@ -58,24 +76,24 @@ function RiderBadges({ r }: { r: Rider }) {
           Inactive
         </span>
       )}
-      <span className="text-xs text-white/40">{r.deliveredCount ?? 0} deliveries</span>
+      <span className={`text-xs ${mutedCls}`}>{r.deliveredCount ?? 0} deliveries</span>
       {(r.activeCount ?? 0) > 0 ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-600">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {r.activeCount} active
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${idleCls}`}>
           Idle
         </span>
       )}
       {r.available ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-status-success/15 px-2.5 py-1 text-xs font-medium text-status-success">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-700">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           Accepting Orders
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/40">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${notAcceptingCls}`}>
           Not Accepting Orders
         </span>
       )}
@@ -88,19 +106,27 @@ export function RidersPanel({
   createEndpoint = "/api/ops/riders",
   bulkImportEndpoint = "/api/ops/riders/bulk",
   locationEndpointBase = "/api/ops/riders",
+  variant = "dark",
+  layout = "default",
 }: {
   initialRiders: Rider[];
-  // Lets the merchant dashboard reuse this exact form/UI against its own
-  // tenant-scoped API routes instead of the ops ones -- defaults keep ops's
-  // existing behavior completely unchanged.
   createEndpoint?: string;
   bulkImportEndpoint?: string;
   locationEndpointBase?: string;
+  variant?: "dark" | "light";
+  layout?: "default" | "split";
 }) {
+  const isLight = variant === "light";
+  const isSplit = layout === "split";
+  const PanelCard = isLight ? MerchantCard : Card;
+  const PanelInput = isLight ? MerchantInput : Input;
   const [riders, setRiders] = useState(initialRiders);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>({ kind: "closed" });
+  const [localSearch, setLocalSearch] = useState("");
+  const globalSearch = useMerchantSearch().query;
+  const searchQuery = isLight && globalSearch.trim() ? globalSearch : localSearch;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
@@ -265,9 +291,9 @@ export function RidersPanel({
   function renderEditForm() {
     return (
       <div className="space-y-2">
-        <Input placeholder="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+        <PanelInput placeholder="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
         <div>
-          <Input
+          <PanelInput
             placeholder="Phone (e.g. 03XXXXXXXXX)"
             value={editPhone}
             onChange={(e) => {
@@ -282,7 +308,7 @@ export function RidersPanel({
             </p>
           )}
         </div>
-        <Input
+        <PanelInput
           placeholder="License plate (e.g. ABC-123)"
           value={editPlate}
           onChange={(e) => setEditPlate(e.target.value)}
@@ -301,6 +327,23 @@ export function RidersPanel({
   }
 
   function renderEditDeactivateButtons(r: Rider) {
+    if (isLight) {
+      return (
+        <>
+          <MerchantButton variant="secondary" size="sm" onClick={() => startEdit(r)}>
+            Edit
+          </MerchantButton>
+          <MerchantButton
+            variant="danger"
+            size="sm"
+            onClick={() => toggleActive(r)}
+            disabled={togglingId === r.id}
+          >
+            {togglingId === r.id ? <Spinner className="h-4 w-4" /> : r.active ? "Deactivate" : "Activate"}
+          </MerchantButton>
+        </>
+      );
+    }
     return (
       <>
         <Button variant="accent-outline" size="sm" onClick={() => startEdit(r)}>
@@ -313,54 +356,88 @@ export function RidersPanel({
     );
   }
 
+  const filteredRiders = riders.filter((r) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      const haystack = [r.name, r.phone, r.license_plate ?? ""].join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const mapOpen = mapMode.kind !== "closed";
+
   return (
     <div
       className={
-        mapMode.kind !== "closed"
-          // Breaks out of the two nested centered max-width containers this
-          // page sits inside (the ops/merchant layout's max-w-5xl and this
-          // page's own max-w-2xl) so the map can actually use the screen's
-          // width instead of a slice of an already-narrow centered column.
-          // Math: margin-left cancels out through any number of `mx-auto`
-          // ancestors because percentage margins resolve against the
-          // immediate parent's width, not the viewport -- see the -mx trick.
+        !isLight && !isSplit && mapMode.kind !== "closed"
           ? "w-screen max-w-none space-y-6 px-6 ml-[calc(50%_-_50vw)]"
           : "space-y-6"
       }
     >
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant={mapMode.kind === "all" ? "accent" : "accent-outline"}
-          onClick={() => setMapMode((m) => (m.kind === "all" ? { kind: "closed" } : { kind: "all" }))}
-        >
-          {mapMode.kind === "all" ? "Hide Map" : "Show All"}
-        </Button>
-        <Button
-          variant="accent-outline"
-          onClick={() => {
-            setShowBulkImport((v) => !v);
-            setShowAddForm(false);
-          }}
-        >
-          {showBulkImport ? "Cancel" : "Import CSV"}
-        </Button>
-        <Button
-          onClick={() => {
-            setShowAddForm((v) => !v);
-            setShowBulkImport(false);
-          }}
-        >
-          {showAddForm ? "Cancel" : "+ Add Rider"}
-        </Button>
+      <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        {isLight ? (
+          <>
+            <MerchantButton
+              variant="secondary"
+              onClick={() => setMapMode((m) => (m.kind === "all" ? { kind: "closed" } : { kind: "all" }))}
+            >
+              {mapMode.kind === "all" ? "Hide Map" : "Show Map"}
+            </MerchantButton>
+            <MerchantButton
+              variant="secondary"
+              onClick={() => {
+                setShowBulkImport((v) => !v);
+                setShowAddForm(false);
+              }}
+            >
+              {showBulkImport ? "Cancel" : "Import CSV"}
+            </MerchantButton>
+            <MerchantButton
+              onClick={() => {
+                setShowAddForm((v) => !v);
+                setShowBulkImport(false);
+              }}
+            >
+              {showAddForm ? "Cancel" : "+ Add Rider"}
+            </MerchantButton>
+          </>
+        ) : (
+          <>
+            <Button
+              variant={mapMode.kind === "all" ? "accent" : "accent-outline"}
+              onClick={() => setMapMode((m) => (m.kind === "all" ? { kind: "closed" } : { kind: "all" }))}
+            >
+              {mapMode.kind === "all" ? "Hide Map" : "Show All"}
+            </Button>
+            <Button
+              variant="accent-outline"
+              onClick={() => {
+                setShowBulkImport((v) => !v);
+                setShowAddForm(false);
+              }}
+            >
+              {showBulkImport ? "Cancel" : "Import CSV"}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowAddForm((v) => !v);
+                setShowBulkImport(false);
+              }}
+            >
+              {showAddForm ? "Cancel" : "+ Add Rider"}
+            </Button>
+          </>
+        )}
       </div>
 
       {showBulkImport && (
-        <Card title="Bulk Import Riders" className="animate-slide-up">
-          <p className="mb-3 text-sm text-white/50">
-            A CSV file with columns <code className="text-white/70">name</code>,{" "}
-            <code className="text-white/70">phone</code>,{" "}
-            <code className="text-white/70">license_plate</code>, and{" "}
-            <code className="text-white/70">login_pin</code> (any column order, header row
+        <PanelCard title="Bulk Import Riders" className="animate-slide-up">
+          <p className={`mb-3 text-sm ${isLight ? "text-slate-500" : "text-white/50"}`}>
+            A CSV file with columns <code className={isLight ? "text-slate-700" : "text-white/70"}>name</code>,{" "}
+            <code className={isLight ? "text-slate-700" : "text-white/70"}>phone</code>,{" "}
+            <code className={isLight ? "text-slate-700" : "text-white/70"}>license_plate</code>, and{" "}
+            <code className={isLight ? "text-slate-700" : "text-white/70"}>login_pin</code> (any column order, header row
             required).
           </p>
           {importFileError && (
@@ -376,9 +453,13 @@ export function RidersPanel({
                   ` ${importResult.errors.length} row${importResult.errors.length === 1 ? "" : "s"} skipped.`}
               </StatusBanner>
               {importResult.errors.length > 0 && (
-                <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-3">
+                <div
+                  className={`max-h-48 overflow-y-auto rounded-lg border p-3 ${
+                    isLight ? "border-slate-200 bg-slate-50" : "border-white/10 bg-white/5"
+                  }`}
+                >
                   {importResult.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-white/60">
+                    <p key={i} className={`text-xs ${isLight ? "text-slate-600" : "text-white/60"}`}>
                       Line {e.line}: {e.reason}
                     </p>
                   ))}
@@ -395,22 +476,26 @@ export function RidersPanel({
               const file = e.target.files?.[0];
               if (file) void importCsv(file);
             }}
-            className="block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-gold file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-navy"
+            className={`block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-2 file:text-sm file:font-medium ${
+              isLight
+                ? "text-slate-600 file:bg-[var(--merchant-primary,#1e3a5f)] file:text-white"
+                : "text-white/70 file:bg-brand-gold file:text-brand-navy"
+            }`}
           />
           {importing && (
-            <p className="mt-2 flex items-center gap-2 text-sm text-white/50">
+            <p className={`mt-2 flex items-center gap-2 text-sm ${isLight ? "text-slate-500" : "text-white/50"}`}>
               <Spinner className="h-4 w-4" /> Importing…
             </p>
           )}
-        </Card>
+        </PanelCard>
       )}
 
       {showAddForm && (
-        <Card title="Add Rider" className="animate-slide-up">
+        <PanelCard title="Add Rider" className="animate-slide-up">
           <div className="space-y-3">
-            <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+            <PanelInput placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
             <div>
-              <Input
+              <PanelInput
                 ref={phoneInputRef}
                 placeholder="Phone (e.g. 03XXXXXXXXX)"
                 value={phone}
@@ -431,13 +516,13 @@ export function RidersPanel({
                 </p>
               )}
             </div>
-            <Input
+            <PanelInput
               placeholder="License plate (e.g. ABC-123)"
               value={licensePlate}
               onChange={(e) => setLicensePlate(e.target.value)}
             />
             <div>
-              <Input
+              <PanelInput
                 placeholder="App login PIN (6 digits)"
                 value={loginPin}
                 inputMode="numeric"
@@ -454,68 +539,152 @@ export function RidersPanel({
                 </p>
               )}
             </div>
-            <Button
-              onClick={addRider}
-              disabled={submitting || !name || !phone || !licensePlate.trim() || loginPin.length !== 6}
-            >
-              {submitting && <Spinner className="h-4 w-4" />}
-              Add Rider
-            </Button>
+            {isLight ? (
+              <MerchantButton
+                onClick={addRider}
+                disabled={submitting || !name || !phone || !licensePlate.trim() || loginPin.length !== 6}
+              >
+                {submitting && <Spinner className="h-4 w-4" />}
+                Add Rider
+              </MerchantButton>
+            ) : (
+              <Button
+                onClick={addRider}
+                disabled={submitting || !name || !phone || !licensePlate.trim() || loginPin.length !== 6}
+              >
+                {submitting && <Spinner className="h-4 w-4" />}
+                Add Rider
+              </Button>
+            )}
           </div>
-        </Card>
+        </PanelCard>
       )}
 
-      <div className={`flex gap-4 ${mapMode.kind !== "closed" ? "h-[calc(100vh-210px)]" : ""}`}>
+      <div
+        className={
+          mapOpen
+            ? isLight
+              ? "grid h-[calc(100vh-260px)] min-h-[520px] grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,360px)_1fr]"
+              : "flex h-[calc(100vh-280px)] min-h-[480px] gap-4"
+            : ""
+        }
+      >
         <div
-          className={`min-w-0 space-y-6 transition-all duration-300 ${
-            mapMode.kind !== "closed" ? "w-full max-w-sm shrink-0 overflow-y-auto" : "max-w-full flex-1"
+          className={`min-w-0 space-y-4 transition-all duration-300 ${
+            mapOpen
+              ? isLight
+                ? "overflow-y-auto pr-1"
+                : "w-full max-w-sm shrink-0 overflow-y-auto pr-1 lg:max-w-md"
+              : "max-w-full"
           }`}
         >
+          {isLight ? (
+            <MerchantInput
+              placeholder="Search riders by name, phone, or plate…"
+              value={globalSearch.trim() ? globalSearch : localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              disabled={Boolean(globalSearch.trim())}
+            />
+          ) : null}
+
           {mapMode.kind === "single" && selectedRider ? (
-            <div className="animate-fade-in space-y-4 rounded-xl border border-brand-gold bg-brand-gold/10 p-4">
-              <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "all" })}>
-                ← Back to all riders
-              </Button>
+            <div
+              className={`animate-fade-in space-y-4 rounded-xl border p-4 ${
+                isLight ? "border-slate-200 bg-slate-50" : "border-brand-gold bg-brand-gold/10"
+              }`}
+            >
+              {isLight ? (
+                <MerchantButton variant="secondary" size="sm" onClick={() => setMapMode({ kind: "all" })}>
+                  ← Back to all riders
+                </MerchantButton>
+              ) : (
+                <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "all" })}>
+                  ← Back to all riders
+                </Button>
+              )}
               {editingId === selectedRider.id ? (
                 renderEditForm()
               ) : (
                 <>
-                  <RiderInfo r={selectedRider} />
-                  <RiderBadges r={selectedRider} />
+                  <RiderInfo r={selectedRider} light={isLight} />
+                  <RiderBadges r={selectedRider} light={isLight} />
                   <div className="flex flex-wrap gap-2">
-                    {selectedRider.availability_token && (
-                      <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(selectedRider)}>
-                        {copiedId === selectedRider.id ? "Copied!" : "Copy Link"}
-                      </Button>
-                    )}
+                    {selectedRider.availability_token &&
+                      (isLight ? (
+                        <MerchantButton
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => copyAvailabilityLink(selectedRider)}
+                        >
+                          {copiedId === selectedRider.id ? "Copied!" : "Copy Link"}
+                        </MerchantButton>
+                      ) : (
+                        <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(selectedRider)}>
+                          {copiedId === selectedRider.id ? "Copied!" : "Copy Link"}
+                        </Button>
+                      ))}
                     {renderEditDeactivateButtons(selectedRider)}
                   </div>
                 </>
               )}
             </div>
-          ) : riders.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-white/50">
-              No riders yet.
+          ) : filteredRiders.length === 0 ? (
+            <div
+              className={`rounded-xl border border-dashed p-8 text-center ${
+                isLight ? "border-slate-200 text-slate-500" : "border-white/15 text-white/50"
+              }`}
+            >
+              {riders.length === 0
+                ? "No riders yet."
+                : searchQuery.trim()
+                  ? "No riders match your search."
+                  : "No riders yet."}
             </div>
           ) : (
             <div className="space-y-3">
-              {riders.map((r) => (
-                <div key={r.id} className="animate-fade-in space-y-3 rounded-xl border border-white/10 bg-surface-raised p-4 transition-colors hover:bg-white/5">
+              {filteredRiders.map((r) => (
+                <div
+                  key={r.id}
+                  className={`animate-fade-in space-y-3 rounded-xl border p-4 transition-colors ${
+                    isLight
+                      ? "border-slate-200 bg-white hover:bg-slate-50"
+                      : "border-white/10 bg-surface-raised hover:bg-white/5"
+                  }`}
+                >
                   {editingId === r.id ? (
                     renderEditForm()
                   ) : (
                     <>
-                      <RiderInfo r={r} />
-                      <RiderBadges r={r} />
+                      <RiderInfo r={r} light={isLight} />
+                      <RiderBadges r={r} light={isLight} />
                       <div className="flex flex-wrap gap-2">
-                        {r.availability_token && (
-                          <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
-                            {copiedId === r.id ? "Copied!" : "Copy Link"}
+                        {r.availability_token &&
+                          (isLight ? (
+                            <MerchantButton variant="secondary" size="sm" onClick={() => copyAvailabilityLink(r)}>
+                              {copiedId === r.id ? "Copied!" : "Copy Link"}
+                            </MerchantButton>
+                          ) : (
+                            <Button variant="accent-outline" size="sm" onClick={() => copyAvailabilityLink(r)}>
+                              {copiedId === r.id ? "Copied!" : "Copy Link"}
+                            </Button>
+                          ))}
+                        {isLight ? (
+                          <MerchantButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() => setMapMode({ kind: "single", riderId: r.id })}
+                          >
+                            Track Location
+                          </MerchantButton>
+                        ) : (
+                          <Button
+                            variant="accent-outline"
+                            size="sm"
+                            onClick={() => setMapMode({ kind: "single", riderId: r.id })}
+                          >
+                            Track Location
                           </Button>
                         )}
-                        <Button variant="accent-outline" size="sm" onClick={() => setMapMode({ kind: "single", riderId: r.id })}>
-                          Track Location
-                        </Button>
                         {renderEditDeactivateButtons(r)}
                       </div>
                     </>
@@ -524,20 +693,22 @@ export function RidersPanel({
               ))}
             </div>
           )}
-          {mapMode.kind !== "single" && <p className="text-xs text-white/40">{riders.length} riders registered</p>}
+          {mapMode.kind !== "single" && (
+            <p className={`text-xs ${isLight ? "text-slate-500" : "text-white/40"}`}>
+              {filteredRiders.length} of {riders.length} riders
+            </p>
+          )}
         </div>
 
-        {mapMode.kind !== "closed" && (
-          // No explicit height here -- it's a flex child of the row above,
-          // which now has a real height (h-[calc(100vh-260px)]) and the
-          // row's default align-items: stretch fills it automatically.
-          <div className="flex-1 animate-fade-in">
+        {mapOpen && (
+          <div className={`min-h-0 min-w-0 animate-fade-in ${isLight ? "h-full" : "flex h-full flex-1"}`}>
             {mapMode.kind === "all" ? (
               <AllRidersMapPanel
                 riders={riders.map((r) => ({ id: r.id, name: r.name }))}
                 endpointBase={locationEndpointBase}
                 onClose={() => setMapMode({ kind: "closed" })}
                 onSelectRider={(riderId) => setMapMode({ kind: "single", riderId })}
+                variant={isLight ? "light" : "dark"}
               />
             ) : selectedRider ? (
               <RiderLocationPanel
@@ -545,7 +716,7 @@ export function RidersPanel({
                 riderId={selectedRider.id}
                 riderName={selectedRider.name}
                 endpointBase={locationEndpointBase}
-                onClose={() => setMapMode({ kind: "closed" })}
+                onClose={() => setMapMode(mapOpen && mapMode.kind === "single" ? { kind: "all" } : { kind: "closed" })}
               />
             ) : null}
           </div>

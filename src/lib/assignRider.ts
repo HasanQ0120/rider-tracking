@@ -1,7 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateTrackingToken, generatePin, hashPin } from "@/lib/tokens";
-import { sendRiderLink, sendRiderPin, sendCustomerLink, isTestNotificationProvider } from "@/lib/notify";
+import { sendCustomerLink, isTestNotificationProvider } from "@/lib/notify";
+
+export type RiderAssignmentResult = {
+  /** Ops test-mode only — merchant/rider-app flows do not use per-order PINs. */
+  pin: string | null;
+  customerTrackingToken: string | null;
+};
 import { TOKEN_TIME_BUDGET_HOURS } from "@/lib/config";
 
 // Shared by ops's manual "Assign Rider" action and auto-assignment at order
@@ -39,8 +45,8 @@ export async function performRiderAssignment(
     customerName: string;
     isReassignment: boolean;
   }
-): Promise<string | null> {
-  const { orderId, riderId, riderPhone, customerPhone, customerName, isReassignment } = params;
+): Promise<RiderAssignmentResult> {
+  const { orderId, riderId, riderPhone: _riderPhone, customerPhone, customerName, isReassignment } = params;
 
   const expiresAt = new Date(Date.now() + TOKEN_TIME_BUDGET_HOURS * 3_600_000).toISOString();
   const riderTokenStr = generateTrackingToken();
@@ -114,10 +120,7 @@ export async function performRiderAssignment(
     assigned_at: new Date().toISOString(),
   };
   if (!isReassignment) updatePayload.status = "assigned";
-  // Checked (unlike the writes above it in this file historically were)
-  // because everything after this point -- the rider's real SMS link and
-  // PIN -- gets sent unconditionally next; never notify a rider of an
-  // assignment that wasn't actually persisted.
+  // Assignment is persisted before any notification — never SMS before DB succeeds.
   const { error: orderUpdateError } = await supabase
     .from("orders")
     .update(updatePayload)
@@ -126,17 +129,14 @@ export async function performRiderAssignment(
     throw new Error("Failed to update order with assignment");
   }
 
-  await Promise.all([
-    sendRiderLink(riderPhone, riderTokenStr, customerName),
-    sendRiderPin(riderPhone, pin, customerName),
-    // Only sent on the very first assignment -- the customer token is
-    // scoped to the order, not the rider, so reassignment never touches it.
-    customerTokenStr && customerPhone
-      ? sendCustomerLink(customerPhone, customerTokenStr)
-      : Promise.resolve(),
-  ]);
+  // Riders use the native app inbox — no SMS web link or per-order PIN.
+  // Customer link SMS is optional; merchants typically send the URL themselves.
+  if (customerTokenStr && customerPhone) {
+    await sendCustomerLink(customerPhone, customerTokenStr);
+  }
 
-  // Only while no real SMS provider is connected -- once isTestNotificationProvider
-  // flips to false (a real provider swapped in), callers stop surfacing the PIN.
-  return isTestNotificationProvider ? pin : null;
+  return {
+    pin: isTestNotificationProvider ? pin : null,
+    customerTrackingToken: customerTokenStr,
+  };
 }

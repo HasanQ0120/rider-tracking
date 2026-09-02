@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
+import { MerchantButton, MerchantInput } from "@/components/merchant/MerchantUi";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
@@ -45,36 +43,62 @@ export function AccountPasswordForm() {
   }
 
   return (
-    <Card title="Change Password">
+    <div>
+      <h3 className="font-semibold text-slate-900">Change password</h3>
+      <p className="mt-1 text-sm text-slate-500">
+        Use at least 8 characters. Signing out of other sessions is recommended after a change.
+      </p>
       {error && (
-        <div className="mb-4">
+        <div className="mb-4 mt-4">
           <StatusBanner tone="danger">{error}</StatusBanner>
         </div>
       )}
       {success && (
-        <div className="mb-4">
+        <div className="mb-4 mt-4">
           <StatusBanner tone="success">Password updated.</StatusBanner>
         </div>
       )}
-      <div className="space-y-3">
-        <Input
-          type="password"
-          placeholder="New password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Input
-          type="password"
-          placeholder="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-        />
-        <Button onClick={submit} disabled={submitting || !password || !confirmPassword}>
-          {submitting && <Spinner className="h-4 w-4" />}
-          {submitting ? "Updating…" : "Update Password"}
-        </Button>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            New password
+          </label>
+          <MerchantInput
+            type="password"
+            placeholder="Enter new password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Confirm password
+          </label>
+          <MerchantInput
+            type="password"
+            placeholder="Repeat new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+        </div>
       </div>
-    </Card>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <MerchantButton onClick={submit} disabled={submitting || !password || !confirmPassword}>
+          {submitting && <Spinner className="h-4 w-4" />}
+          {submitting ? "Updating…" : "Update password"}
+        </MerchantButton>
+        <MerchantButton
+          variant="secondary"
+          onClick={() => {
+            setPassword("");
+            setConfirmPassword("");
+            setError(null);
+          }}
+        >
+          Cancel
+        </MerchantButton>
+      </div>
+    </div>
   );
 }
