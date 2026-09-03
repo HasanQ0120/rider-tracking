@@ -1,29 +1,48 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
+import { requireV1ApiKey } from "@/lib/tenant/v1Api";
 import { validateRiderFields, type ParsedRider } from "@/lib/riderValidation";
 import { buildRiderInsertRows } from "@/lib/rider/insertRows";
 import { sendAvailabilityLink } from "@/lib/notify";
 
-const MIN_INTERVAL_MS = 500;
-const lastRequestByTenant = new Map<string, number>();
+const RIDER_LIST_SELECT =
+  "id, name, phone, active, available, license_plate, created_at";
+
+/**
+ * List this tenant's riders for merchant systems (Golootlo portal / POS dropdown).
+ * Query: ?active=true|false (optional), ?available=true|false (optional)
+ */
+export async function GET(req: Request) {
+  const guard = await requireV1ApiKey(req);
+  if ("error" in guard) return guard.error;
+  const { tenant, service } = guard;
+
+  const url = new URL(req.url);
+  const activeParam = url.searchParams.get("active");
+  const availableParam = url.searchParams.get("available");
+
+  let query = service
+    .from("riders")
+    .select(RIDER_LIST_SELECT)
+    .eq("tenant_id", tenant.id)
+    .order("name", { ascending: true });
+
+  if (activeParam === "true") query = query.eq("active", true);
+  if (activeParam === "false") query = query.eq("active", false);
+  if (availableParam === "true") query = query.eq("available", true);
+  if (availableParam === "false") query = query.eq("available", false);
+
+  const { data, error } = await query;
+  if (error) {
+    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ status: "ok", riders: data ?? [] });
+}
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("authorization") ?? "";
-  const rawKey = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : null;
-
-  const service = createServiceClient();
-  const tenant = await resolveTenantByApiKey(service, rawKey);
-  if (!tenant) {
-    return NextResponse.json({ status: "unauthorized" }, { status: 401 });
-  }
-
-  const now = Date.now();
-  const lastForTenant = lastRequestByTenant.get(tenant.id) ?? 0;
-  if (now - lastForTenant < MIN_INTERVAL_MS) {
-    return NextResponse.json({ status: "rate_limited" }, { status: 429 });
-  }
-  lastRequestByTenant.set(tenant.id, now);
+  const guard = await requireV1ApiKey(req);
+  if ("error" in guard) return guard.error;
+  const { tenant, service } = guard;
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {

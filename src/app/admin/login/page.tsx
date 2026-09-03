@@ -7,6 +7,7 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { Logo } from "@/components/ui/Logo";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { Button } from "@/components/ui/Button";
 
 function MailIcon() {
   return (
@@ -116,10 +117,10 @@ function AdminLoginForm() {
               />
             </div>
           </div>
-          <MerchantButton className="w-full" onClick={submit} disabled={loading}>
+          <Button className="w-full" onClick={submit} disabled={loading}>
             {loading ? <Spinner className="h-4 w-4" /> : null}
             {loading ? "Signing in…" : "Sign In"}
-          </MerchantButton>
+          </Button>
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           Platform admin accounts are provisioned manually — there is no self-service signup.

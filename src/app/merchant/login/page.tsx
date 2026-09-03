@@ -123,7 +123,10 @@ function MerchantLoginForm() {
         setError("Invalid Merchant ID or password.");
         return;
       }
-      router.push("/merchant");
+      const next = searchParams.get("next");
+      const safeNext =
+        next && next.startsWith("/") && !next.startsWith("//") ? next : "/merchant";
+      router.push(safeNext);
       router.refresh();
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");

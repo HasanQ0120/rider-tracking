@@ -1,37 +1,21 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { resolveTenantByApiKey } from "@/lib/tenant/resolveApiKey";
+import {
+  normalizeExternalOrderId,
+  normalizeIntegrationSource,
+  requireV1ApiKey,
+} from "@/lib/tenant/v1Api";
 import { runAutoAssignment } from "@/lib/autoAssign";
 import { cleanPhoneInput, isValidPakistaniMobile } from "@/lib/phone";
 import { geocodeAddress } from "@/lib/geocode";
 import { customerTrackingUrl } from "@/lib/appUrl";
 import { getCustomerTrackingUrlForOrder } from "@/lib/trackingTokens";
+import { performRiderAssignment } from "@/lib/assignRider";
 
-// The one genuinely public-facing, credential-only endpoint in the app --
-// a merchant's own backend calls this directly, no browser session
-// involved. In-memory sliding window per tenant (same pattern as
-// /api/geocode's per-IP one) -- resets on restart, doesn't share state
-// across instances, which is fine for the traffic this is meant to absorb
-// (a merchant's own order-creation calls, not public scraping).
-const MIN_INTERVAL_MS = 500;
-const lastRequestByTenant = new Map<string, number>();
-
+// Public merchant inbound API — API key only (no browser session).
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("authorization") ?? "";
-  const rawKey = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : null;
-
-  const service = createServiceClient();
-  const tenant = await resolveTenantByApiKey(service, rawKey);
-  if (!tenant) {
-    return NextResponse.json({ status: "unauthorized" }, { status: 401 });
-  }
-
-  const now = Date.now();
-  const lastForTenant = lastRequestByTenant.get(tenant.id) ?? 0;
-  if (now - lastForTenant < MIN_INTERVAL_MS) {
-    return NextResponse.json({ status: "rate_limited" }, { status: 429 });
-  }
-  lastRequestByTenant.set(tenant.id, now);
+  const guard = await requireV1ApiKey(req);
+  if ("error" in guard) return guard.error;
+  const { tenant, service } = guard;
 
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -46,6 +30,9 @@ export async function POST(req: Request) {
     address_detail,
     pickup_lat,
     pickup_lng,
+    source,
+    external_order_id,
+    rider_id,
   } = body;
 
   if (!customer_name || !customer_phone || !delivery_address) {
@@ -58,19 +45,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "invalid_request" }, { status: 400 });
   }
 
-  // Recorded on the order itself (not just used transiently) so a
-  // multi-branch merchant's per-order pickup point stays auditable even if
-  // their tenant-wide default changes later.
+  const normalizedSource = normalizeIntegrationSource(source);
+  if (source != null && source !== "" && !normalizedSource) {
+    return NextResponse.json(
+      {
+        status: "invalid_source",
+        message: "source must be 1–64 chars: letters, numbers, underscore, hyphen (e.g. golootlo, pos, website).",
+      },
+      { status: 400 }
+    );
+  }
+
+  const externalOrderId = normalizeExternalOrderId(external_order_id);
+  if (external_order_id != null && external_order_id !== "" && !externalOrderId) {
+    return NextResponse.json({ status: "invalid_external_order_id" }, { status: 400 });
+  }
+
   const resolvedPickupLat = pickup_lat ?? tenant.defaultPickupLat;
   const resolvedPickupLng = pickup_lng ?? tenant.defaultPickupLng;
 
-  // Coordinates are optional on this endpoint -- callers integrating over
-  // curl/webhook commonly only have a text address on hand. Best-effort
-  // only: a caller-provided pair always wins, and a failed/empty geocode
-  // never blocks order creation -- it just leaves the order exactly as
-  // coordinate-less as an explicit omission always has, showing the
-  // "waiting for a delivery location" placeholder on the customer page
-  // instead of a real pin.
   let resolvedDeliveryLat = delivery_lat ?? null;
   let resolvedDeliveryLng = delivery_lng ?? null;
   if (resolvedDeliveryLat == null && resolvedDeliveryLng == null) {
@@ -93,12 +86,59 @@ export async function POST(req: Request) {
       address_detail: address_detail?.trim() || null,
       pickup_lat: resolvedPickupLat ?? null,
       pickup_lng: resolvedPickupLng ?? null,
+      source: normalizedSource,
+      external_order_id: externalOrderId,
     })
     .select()
     .single();
 
   if (error || !order) {
     return NextResponse.json({ status: "error" }, { status: 500 });
+  }
+
+  // Explicit rider_id wins over auto-assign (POS / Golootlo pick a rider themselves).
+  if (rider_id) {
+    const { data: rider } = await service
+      .from("riders")
+      .select("id, tenant_id, name, phone, active")
+      .eq("id", rider_id)
+      .maybeSingle();
+
+    if (!rider || rider.tenant_id !== tenant.id || !rider.active) {
+      return NextResponse.json(
+        {
+          status: "rider_not_found",
+          order,
+          message: "Order created but rider_id is invalid for this tenant.",
+        },
+        { status: 404 }
+      );
+    }
+
+    try {
+      const result = await performRiderAssignment(service, {
+        orderId: order.id,
+        riderId: rider.id,
+        riderPhone: rider.phone,
+        customerPhone: order.customer_phone,
+        customerName: order.customer_name,
+        isReassignment: false,
+      });
+
+      const { data: finalOrder } = await service.from("orders").select().eq("id", order.id).single();
+      const token = result.customerTrackingToken;
+      return NextResponse.json({
+        status: "ok",
+        order: finalOrder ?? order,
+        assignedRider: { id: rider.id, name: rider.name },
+        customer_tracking_url: token ? customerTrackingUrl(token) : null,
+      });
+    } catch {
+      return NextResponse.json(
+        { status: "assign_failed", order, message: "Order created but assignment failed." },
+        { status: 500 }
+      );
+    }
   }
 
   const assignment =
