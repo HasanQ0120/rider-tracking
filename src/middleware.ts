@@ -1,11 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Gates /ops/*, /merchant/*, and /admin/* on a logged-in Supabase Auth
-// session. Whether that user is actually provisioned (ops_staff row,
-// merchant app_metadata claim, or platform_admins row) is checked
-// separately in each area's own layout/API routes.
+// Gates /merchant/* and /admin/* on a logged-in Supabase Auth session.
+// /ops/* permanently redirects into Admin (Ops portal merged away).
+// Role checks (platform_admins / merchant claims) live in each area's guards.
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Ops portal merged into Admin.
+  if (pathname === "/ops" || pathname.startsWith("/ops/")) {
+    const url = request.nextUrl.clone();
+    if (pathname.startsWith("/ops/login")) {
+      url.pathname = "/admin/login";
+    } else {
+      url.pathname = "/admin";
+    }
+    return NextResponse.redirect(url);
+  }
+
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -28,12 +40,7 @@ export async function middleware(request: NextRequest) {
 
   const { data } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
-  const loginPath = pathname.startsWith("/merchant")
-    ? "/merchant/login"
-    : pathname.startsWith("/admin")
-      ? "/admin/login"
-      : "/ops/login";
+  const loginPath = pathname.startsWith("/merchant") ? "/merchant/login" : "/admin/login";
   const isLoginPage = pathname === loginPath;
   if (!data.user && !isLoginPage) {
     const url = request.nextUrl.clone();
@@ -45,5 +52,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/ops/:path*", "/merchant/:path*", "/admin/:path*"],
+  matcher: ["/ops/:path*", "/ops", "/merchant/:path*", "/admin/:path*"],
 };

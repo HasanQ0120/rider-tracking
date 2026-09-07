@@ -152,7 +152,7 @@ export function CreateTenantForm() {
               {loading ? <Spinner className="h-4 w-4" /> : null}
               {loading ? "Creating…" : "Create tenant"}
             </MerchantButton>
-            <MerchantButton variant="secondary" onClick={() => router.push("/admin")} disabled={loading}>
+            <MerchantButton variant="secondary" onClick={() => router.push("/admin/tenants")} disabled={loading}>
               Cancel
             </MerchantButton>
           </div>

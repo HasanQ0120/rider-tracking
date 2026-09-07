@@ -717,6 +717,7 @@ export function RidersPanel({
                 riderName={selectedRider.name}
                 endpointBase={locationEndpointBase}
                 onClose={() => setMapMode(mapOpen && mapMode.kind === "single" ? { kind: "all" } : { kind: "closed" })}
+                variant={isLight ? "light" : "dark"}
               />
             ) : null}
           </div>

@@ -17,12 +17,15 @@ export function RiderLocationPanel({
   riderName,
   endpointBase,
   onClose,
+  variant = "dark",
 }: {
   riderId: string;
   riderName: string;
   endpointBase: string;
   onClose: () => void;
+  variant?: "dark" | "light";
 }) {
+  const isLight = variant === "light";
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [invalid, setInvalid] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,30 +75,50 @@ export function RiderLocationPanel({
       : null;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-surface-raised">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <p className="font-medium text-white">{riderName}</p>
+    <div
+      className={`flex h-full flex-col overflow-hidden rounded-xl border ${
+        isLight ? "border-slate-200 bg-white" : "border-white/10 bg-surface-raised"
+      }`}
+    >
+      <div
+        className={`flex items-center justify-between border-b px-4 py-3 ${
+          isLight ? "border-slate-100" : "border-white/10"
+        }`}
+      >
+        <p className={`font-medium ${isLight ? "text-slate-900" : "text-white"}`}>{riderName}</p>
         <button
           onClick={onClose}
           aria-label="Close"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+          className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+            isLight
+              ? "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              : "text-white/50 hover:bg-white/10 hover:text-white"
+          }`}
         >
           ×
         </button>
       </div>
       <div className="relative flex-1">
         {invalid ? (
-          <div className="flex h-full items-center justify-center p-6 text-center text-sm text-white/50">
+          <div
+            className={`flex h-full items-center justify-center p-6 text-center text-sm ${
+              isLight ? "text-slate-500" : "text-white/50"
+            }`}
+          >
             Couldn&apos;t load this rider&apos;s location.
           </div>
         ) : !snapshot ? (
           <div className="flex h-full items-center justify-center">
-            <Spinner className="h-6 w-6 text-white/50" />
+            <Spinner className={`h-6 w-6 ${isLight ? "text-slate-400" : "text-white/50"}`} />
           </div>
         ) : marker ? (
           <TrackingMap markers={[marker]} defaultCenter={[marker.lat, marker.lng]} />
         ) : (
-          <div className="flex h-full items-center justify-center p-6 text-center text-sm text-white/50">
+          <div
+            className={`flex h-full items-center justify-center p-6 text-center text-sm ${
+              isLight ? "text-slate-500" : "text-white/50"
+            }`}
+          >
             No location data available.
           </div>
         )}

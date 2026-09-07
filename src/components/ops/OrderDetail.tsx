@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  MerchantButton,
+  MerchantCard,
+  MerchantSelect,
+} from "@/components/merchant/MerchantUi";
 import { formatOrderCode } from "@/lib/orderCode";
 import { orderStatusBadgeClasses, orderStatusLabel } from "@/lib/orderStatus";
 
@@ -199,8 +202,14 @@ export function OrderDetail({
     ? "rounded-xl border border-white/10 bg-white/[0.03] p-5"
     : "";
 
-  const labelCls = merchantMode ? "text-xs uppercase tracking-wide text-white/40" : "text-xs uppercase tracking-wide text-white/40";
-  const valueCls = merchantMode ? "text-white" : "text-white";
+  const labelCls = merchantMode
+    ? "text-xs uppercase tracking-wide text-white/40"
+    : "text-xs uppercase tracking-wide text-slate-500";
+  const valueCls = merchantMode ? "text-white" : "text-slate-900";
+  const mutedCls = merchantMode ? "text-white/50" : "text-slate-500";
+  const OpsCard = MerchantCard;
+  const OpsButton = MerchantButton;
+  const OpsSelect = MerchantSelect;
 
   return (
     <div className={shellCls}>
@@ -210,7 +219,7 @@ export function OrderDetail({
           className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
             merchantMode
               ? "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
           }`}
           aria-label="Back to Orders"
         >
@@ -218,17 +227,21 @@ export function OrderDetail({
         </Link>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-mono text-xl font-semibold text-white md:text-2xl">
+            <h1
+              className={`font-mono text-xl font-semibold md:text-2xl ${
+                merchantMode ? "text-white" : "text-slate-900"
+              }`}
+            >
               {formatOrderCode(orderRank)}
             </h1>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${orderStatusBadgeClasses(order.status)}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${orderStatusBadgeClasses(order.status, !merchantMode)}`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {orderStatusLabel(order.status)}
             </span>
           </div>
-          <p className="text-sm text-white/50">Created {formatTimestamp(order.created_at)}</p>
+          <p className={`text-sm ${mutedCls}`}>Created {formatTimestamp(order.created_at)}</p>
         </div>
       </div>
 
@@ -282,7 +295,7 @@ export function OrderDetail({
               </div>
             </div>
           ) : (
-          <Card title="Customer Details">
+          <OpsCard title="Customer Details">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className={labelCls}>Name</p>
@@ -305,13 +318,13 @@ export function OrderDetail({
               {order.delivery_lat != null && order.delivery_lng != null && (
                 <div className="col-span-2">
                   <p className={labelCls}>Coordinates</p>
-                  <p className="font-mono text-sm text-brand-gold/80">
+                  <p className="font-mono text-sm text-[var(--merchant-primary)]">
                     {order.delivery_lat.toFixed(6)}, {order.delivery_lng.toFixed(6)}
                   </p>
                 </div>
               )}
             </div>
-          </Card>
+          </OpsCard>
           )}
 
           {order.status !== "delivered" &&
@@ -369,9 +382,9 @@ export function OrderDetail({
                 )}
               </div>
             ) : (
-            <Card title="Assign Rider">
+            <OpsCard title="Assign Rider">
               <div className="flex gap-2">
-                <Select
+                <OpsSelect
                   className="flex-1"
                   value={selectedRider}
                   onChange={(e) => setSelectedRider(e.target.value)}
@@ -382,28 +395,28 @@ export function OrderDetail({
                       {r.name} — {r.phone}
                     </option>
                   ))}
-                </Select>
-                <Button onClick={() => assign(false)} disabled={busy || !selectedRider}>
+                </OpsSelect>
+                <OpsButton onClick={() => assign(false)} disabled={busy || !selectedRider}>
                   {busyAction === "assign" && <Spinner className="h-4 w-4" />}
                   {busyAction === "assign"
                     ? "Assigning…"
                     : order.assigned_rider_id
                       ? "Reassign"
                       : "Assign"}
-                </Button>
+                </OpsButton>
               </div>
               {needsConfirm && (
                 <div className="mt-3 animate-scale-in space-y-2">
                   <StatusBanner tone="warning">
                     This order already has an active rider. Confirm to reassign — the current rider&apos;s link will be revoked immediately.
                   </StatusBanner>
-                  <Button onClick={() => assign(true)} disabled={busy}>
+                  <OpsButton onClick={() => assign(true)} disabled={busy}>
                     {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
                     {busyAction === "reassign" ? "Reassigning…" : "Confirm Reassignment"}
-                  </Button>
+                  </OpsButton>
                 </div>
               )}
-            </Card>
+            </OpsCard>
             ))}
 
           {((showRiderLinks && activeRiderToken) || activeCustomerToken) &&
@@ -439,7 +452,7 @@ export function OrderDetail({
                 </div>
               </div>
             ) : !merchantMode ? (
-            <Card
+            <OpsCard
               title="Active Links"
               className="animate-fade-in"
             >
@@ -447,62 +460,64 @@ export function OrderDetail({
                 {showRiderLinks && activeRiderToken && (
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm text-white/70">
+                      <p className="min-w-0 flex-1 truncate text-sm text-slate-600">
                         Rider Link
                         {displayedPin && (
-                          <span className="ml-2 font-mono text-xs text-brand-gold">PIN: {displayedPin}</span>
+                          <span className="ml-2 font-mono text-xs text-[var(--merchant-primary)]">
+                            PIN: {displayedPin}
+                          </span>
                         )}
                       </p>
                       <a href={`/rider/${activeRiderToken.token}`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="accent-outline" size="sm">
+                        <OpsButton variant="secondary" size="sm">
                           Open
-                        </Button>
+                        </OpsButton>
                       </a>
-                      <Button
-                        variant="accent-outline"
+                      <OpsButton
+                        variant="secondary"
                         size="sm"
                         onClick={() => copyLink("rider", `${origin}/rider/${activeRiderToken.token}`)}
                       >
                         {copied === "rider" ? "Copied!" : "Copy"}
-                      </Button>
+                      </OpsButton>
                     </div>
                   </div>
                 )}
                 {activeCustomerToken && (
                   <div className="flex items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate text-sm text-white/70">
+                    <p className="min-w-0 flex-1 truncate text-sm text-slate-600">
                       Customer Link{" "}
-                      <span className="text-xs text-white/40">No PIN required</span>
+                      <span className="text-xs text-slate-400">No PIN required</span>
                     </p>
                     <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
-                      <Button variant="accent-outline" size="sm">
+                      <OpsButton variant="secondary" size="sm">
                         Open
-                      </Button>
+                      </OpsButton>
                     </a>
-                    <Button
-                      variant="accent-outline"
+                    <OpsButton
+                      variant="secondary"
                       size="sm"
                       onClick={() => copyLink("customer", `${origin}/customer/${activeCustomerToken.token}`)}
                     >
                       {copied === "customer" ? "Copied!" : "Copy"}
-                    </Button>
+                    </OpsButton>
                   </div>
                 )}
               </div>
-            </Card>
+            </OpsCard>
             ) : null)}
 
           {showResetSessionAction && activeRiderToken && (
-            <Card title="Device Swap" className="animate-fade-in">
-              <p className="mb-3 text-sm text-white/60">
+            <OpsCard title="Device Swap" className="animate-fade-in">
+              <p className="mb-3 text-sm text-slate-500">
                 Resets the rider&apos;s session and generates a new PIN. Use when the rider changes
                 device.
               </p>
-              <Button variant="accent-outline" onClick={resetSession} disabled={busy}>
+              <OpsButton variant="secondary" onClick={resetSession} disabled={busy}>
                 {busyAction === "reset" && <Spinner className="h-4 w-4" />}
                 {busyAction === "reset" ? "Resetting…" : "Reset Session"}
-              </Button>
-            </Card>
+              </OpsButton>
+            </OpsCard>
           )}
 
           {showCancelAction && order.status !== "delivered" && order.status !== "cancelled" && (
@@ -551,23 +566,25 @@ export function OrderDetail({
               </ol>
             </div>
           ) : (
-          <Card title="Status History">
+          <OpsCard title="Status History">
             <ol className="space-y-4">
               {timeline.map((event, i) => (
                 <li key={`${event.label}-${event.at}`} className="flex gap-3">
                   <span
                     className={`mt-1 flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                      i === timeline.length - 1 ? "bg-brand-gold" : "bg-white/25"
+                      i === timeline.length - 1
+                        ? "bg-[var(--merchant-primary)]"
+                        : "bg-slate-300"
                     }`}
                   />
                   <div>
-                    <p className="text-sm font-medium text-white">{event.label}</p>
-                    <p className="text-xs text-white/40">{formatTimestamp(event.at)}</p>
+                    <p className="text-sm font-medium text-slate-900">{event.label}</p>
+                    <p className="text-xs text-slate-400">{formatTimestamp(event.at)}</p>
                   </div>
                 </li>
               ))}
             </ol>
-          </Card>
+          </OpsCard>
           )}
         </div>
       </div>

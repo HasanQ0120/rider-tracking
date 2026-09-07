@@ -3,18 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  MerchantButton,
-  MerchantCard,
-  MerchantInput,
-  MerchantPageHeader,
-} from "@/components/merchant/MerchantUi";
+import { MerchantButton, MerchantCard, MerchantInput } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { merchantIdToEmail } from "@/lib/admin/merchantEmail";
 import { tenantStatusLabel, type TenantRow } from "@/lib/admin/tenantTypes";
-
-type TenantDetail = TenantRow;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,15 +18,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail }) {
+/** Bird's-eye overview: profile, account status, API key, password — no branding. */
+export function TenantOverviewPanel({
+  tenant: initial,
+  stats,
+}: {
+  tenant: TenantRow;
+  stats: { orderCount: number; riderCount: number; activeOrders: number; flaggedOrders: number };
+}) {
   const router = useRouter();
   const [tenant, setTenant] = useState(initial);
   const [name, setName] = useState(tenant.name);
   const [contactEmail, setContactEmail] = useState(tenant.contact_email ?? "");
   const [webhookUrl, setWebhookUrl] = useState(tenant.webhook_url ?? "");
-  const [primaryColor, setPrimaryColor] = useState(tenant.primary_color);
-  const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color);
-  const [accentColor, setAccentColor] = useState(tenant.accent_color);
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
@@ -52,9 +49,6 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
           name,
           contactEmail: contactEmail.trim() || null,
           webhookUrl: webhookUrl.trim() || null,
-          primaryColor,
-          secondaryColor,
-          accentColor,
         }),
       });
       const data = await res.json();
@@ -144,7 +138,11 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
   }
 
   async function revokeApiKey() {
-    if (!confirm("Revoke this tenant's API key? Inbound order creation will stop until a new key is issued.")) {
+    if (
+      !confirm(
+        "Revoke this tenant's API key? Inbound order creation will stop until a new key is issued."
+      )
+    ) {
       return;
     }
     setApiKeyLoading(true);
@@ -166,26 +164,8 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
     }
   }
 
-  const status = tenantStatusLabel(tenant);
-
   return (
     <div>
-      <MerchantPageHeader
-        title={tenant.name}
-        subtitle={
-          <span>
-            <span className="font-mono">{tenant.merchant_id}</span>
-            <span className="mx-2 text-slate-300">·</span>
-            <span>{status}</span>
-          </span>
-        }
-        actions={
-          <Link href="/admin">
-            <MerchantButton variant="secondary">Back to list</MerchantButton>
-          </Link>
-        }
-      />
-
       {message ? (
         <div className="mb-4">
           <StatusBanner tone={message.tone}>{message.text}</StatusBanner>
@@ -204,6 +184,25 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
           </StatusBanner>
         </div>
       ) : null}
+
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Orders</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{stats.orderCount}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{stats.activeOrders}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Flagged</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{stats.flaggedOrders}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Riders</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{stats.riderCount}</p>
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <MerchantCard title="Profile">
@@ -234,34 +233,6 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
                 onChange={(e) => setWebhookUrl(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {(
-                [
-                  ["Primary", primaryColor, setPrimaryColor],
-                  ["Secondary", secondaryColor, setSecondaryColor],
-                  ["Accent", accentColor, setAccentColor],
-                ] as const
-              ).map(([label, value, setter]) => (
-                <div key={label}>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {label}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={value}
-                      onChange={(e) => setter(e.target.value)}
-                      className="h-10 w-10 cursor-pointer rounded-lg border border-slate-200"
-                    />
-                    <MerchantInput
-                      value={value}
-                      onChange={(e) => setter(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
             <MerchantButton onClick={saveProfile} disabled={saving}>
               {saving ? <Spinner className="h-4 w-4" /> : null}
               {saving ? "Saving…" : "Save changes"}
@@ -272,6 +243,7 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
         <div className="space-y-6">
           <MerchantCard title="Account">
             <dl className="grid gap-4 sm:grid-cols-2">
+              <Field label="Status">{tenantStatusLabel(tenant)}</Field>
               <Field label="Login email">
                 <span className="font-mono text-xs">{merchantIdToEmail(tenant.merchant_id)}</span>
               </Field>
@@ -287,7 +259,7 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
               >
                 {tenant.suspended_at ? "Reactivate tenant" : "Suspend tenant"}
               </MerchantButton>
-              <Link href={`/merchant/login`} target="_blank">
+              <Link href="/merchant/login" target="_blank">
                 <MerchantButton variant="secondary">Merchant login ↗</MerchantButton>
               </Link>
             </div>
@@ -313,6 +285,9 @@ export function TenantDetailPanel({ tenant: initial }: { tenant: TenantDetail })
               {tenant.api_key_prefix
                 ? `Active key prefix: ${tenant.api_key_prefix}…`
                 : "No API key issued — merchant cannot create orders via API."}
+            </p>
+            <p className="mb-3 text-xs text-slate-500">
+              Orders are created by Merchant portal / inbound API only — not from Admin.
             </p>
             <div className="flex flex-wrap gap-2">
               <MerchantButton onClick={generateApiKey} disabled={apiKeyLoading}>

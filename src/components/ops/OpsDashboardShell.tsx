@@ -5,10 +5,39 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { PortalSidebar } from "@/components/portal/PortalSidebar";
 import { PortalUserMenu } from "@/components/portal/PortalUserMenu";
-import { ADMIN_NAV_SECTIONS, adminRouteMeta } from "@/lib/admin/nav";
+import {
+  MerchantSearchProvider,
+  useMerchantSearch,
+} from "@/components/merchant/MerchantSearchContext";
+import { OPS_NAV_SECTIONS, opsRouteMeta } from "@/lib/ops/nav";
 import { PORTAL_THEME } from "@/lib/portalTheme";
 
-export function AdminShell({
+function HeaderSearch() {
+  const { query, setQuery } = useMerchantSearch();
+  return (
+    <div className="relative hidden flex-1 md:block md:max-w-md lg:max-w-lg">
+      <svg
+        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3-3" strokeLinecap="round" />
+      </svg>
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search riders, orders, plates…"
+        className="w-full rounded-full border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[var(--merchant-primary)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--merchant-primary)]/20"
+      />
+    </div>
+  );
+}
+
+function ShellInner({
   email,
   children,
 }: {
@@ -16,12 +45,12 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const meta = adminRouteMeta(pathname);
-  const displayName = email?.split("@")[0] ?? "Admin";
+  const meta = opsRouteMeta(pathname);
+  const displayName = email?.split("@")[0] ?? "Ops";
 
   return (
     <div
-      className="admin-portal flex min-h-screen bg-[#eef1f6] text-slate-900"
+      className="ops-portal flex min-h-screen bg-[#eef1f6] text-slate-900"
       style={
         {
           "--merchant-primary": PORTAL_THEME.primary,
@@ -31,18 +60,18 @@ export function AdminShell({
       }
     >
       <aside className="flex min-h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white lg:w-64">
-        <Link href="/admin" className="flex items-center gap-3 border-b border-slate-100 px-5 py-5">
+        <Link href="/ops" className="flex items-center gap-3 border-b border-slate-100 px-5 py-5">
           <Logo size={40} />
           <span className="min-w-0">
             <span className="block truncate text-sm font-bold text-slate-900">Rider Tracking</span>
-            <span className="block truncate text-xs text-slate-500">Platform Admin</span>
+            <span className="block truncate text-xs text-slate-500">Ops</span>
           </span>
         </Link>
         <PortalSidebar
-          sections={ADMIN_NAV_SECTIONS}
+          sections={OPS_NAV_SECTIONS}
           activePath={pathname}
           primaryColor={PORTAL_THEME.primary}
-          homeExact="/admin"
+          homeExact="/ops"
         />
       </aside>
 
@@ -59,11 +88,12 @@ export function AdminShell({
                 </span>
               ))}
             </nav>
+            <HeaderSearch />
             <PortalUserMenu
               name={displayName}
-              subtitle={email ?? "Platform admin"}
+              subtitle={email ?? "Ops staff"}
               primaryColor={PORTAL_THEME.primary}
-              logoutHref="/admin/login"
+              logoutHref="/ops/login"
             />
           </div>
         </header>
@@ -71,5 +101,19 @@ export function AdminShell({
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
+  );
+}
+
+export function OpsDashboardShell({
+  email,
+  children,
+}: {
+  email: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <MerchantSearchProvider>
+      <ShellInner email={email}>{children}</ShellInner>
+    </MerchantSearchProvider>
   );
 }

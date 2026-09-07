@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/lib/supabase/serverAuth";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// API-route variant of requireOpsUser(): returns a 401 JSON response
-// instead of redirect()-ing, since these routes are called via fetch()
-// from client components, not rendered as pages.
+/**
+ * Accepts platform admins (primary) or legacy ops_staff during the Ops→Admin
+ * migration so existing /api/ops/* handlers keep working from the admin UI.
+ */
 export async function requireOpsUserApi(): Promise<
   { user: { id: string } } | { error: NextResponse }
 > {
@@ -16,13 +17,12 @@ export async function requireOpsUserApi(): Promise<
   }
 
   const service = createServiceClient();
-  const { data: staffRow } = await service
-    .from("ops_staff")
-    .select("user_id")
-    .eq("user_id", data.user.id)
-    .maybeSingle();
+  const [{ data: adminRow }, { data: staffRow }] = await Promise.all([
+    service.from("platform_admins").select("user_id").eq("user_id", data.user.id).maybeSingle(),
+    service.from("ops_staff").select("user_id").eq("user_id", data.user.id).maybeSingle(),
+  ]);
 
-  if (!staffRow) {
+  if (!adminRow && !staffRow) {
     return { error: NextResponse.json({ status: "unauthorized" }, { status: 401 }) };
   }
 

@@ -7,7 +7,7 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { Logo } from "@/components/ui/Logo";
 import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
-import { Button } from "@/components/ui/Button";
+import { PORTAL_THEME } from "@/lib/portalTheme";
 
 function MailIcon() {
   return (
@@ -67,7 +67,16 @@ function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#eef1f6] p-6">
+    <div
+      className="flex min-h-screen flex-col items-center justify-center bg-[#eef1f6] p-6"
+      style={
+        {
+          "--merchant-primary": PORTAL_THEME.primary,
+          "--merchant-secondary": PORTAL_THEME.secondary,
+          "--merchant-accent": PORTAL_THEME.accent,
+        } as React.CSSProperties
+      }
+    >
       <div className="mb-8 flex flex-col items-center text-center">
         <Logo size={56} />
         <h1 className="mt-4 text-2xl font-bold text-slate-900">Rider Tracking</h1>
@@ -117,10 +126,10 @@ function AdminLoginForm() {
               />
             </div>
           </div>
-          <Button className="w-full" onClick={submit} disabled={loading}>
+          <MerchantButton className="w-full" onClick={submit} disabled={loading}>
             {loading ? <Spinner className="h-4 w-4" /> : null}
             {loading ? "Signing in…" : "Sign In"}
-          </Button>
+          </MerchantButton>
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           Platform admin accounts are provisioned manually — there is no self-service signup.

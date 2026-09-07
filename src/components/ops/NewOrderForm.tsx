@@ -3,12 +3,14 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  MerchantButton,
+  MerchantCard,
+  MerchantInput,
+  MerchantSelect,
+} from "@/components/merchant/MerchantUi";
 import { TrackingMap } from "@/components/map/TrackingMap";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 import { scrollToError } from "@/lib/scrollToError";
@@ -30,7 +32,11 @@ function candidateKey(c: GeocodeResult): string {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{children}</label>;
+  return (
+    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+      {children}
+    </label>
+  );
 }
 
 export function NewOrderForm({
@@ -79,74 +85,78 @@ export function NewOrderForm({
     setSearching(true);
     setCandidates([]);
     setSelected(null);
+    setSearched(false);
     try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
-      if (res.status === 429) {
-        setError("Please wait a moment and try again.");
-        return;
-      }
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(address.trim())}`);
       const data = await res.json();
-      if (data.status !== "ok") {
-        setError("Failed to search for that address.");
+      if (!res.ok || data.status !== "ok") {
+        showFormError("Address search failed. Try again.");
         return;
       }
-      const results: GeocodeResult[] = data.results;
+      const results: GeocodeResult[] = (data.results ?? []).map(
+        (r: { placeName: string; lat: number; lng: number }) => ({
+          placeName: r.placeName,
+          lat: r.lat,
+          lng: r.lng,
+        })
+      );
       setCandidates(results);
-      if (results[0]) setSelected(results[0]);
+      if (results.length > 0) setSelected(results[0]);
+      setSearched(true);
     } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      showFormError("Address search failed. Try again.");
     } finally {
       setSearching(false);
-      setSearched(true);
     }
   }
 
-  // Dragging fine-tunes an existing pin by a few meters -- keep whatever
-  // label it already had (search result text, or a prior manual label),
-  // only the coordinates move.
-  function handlePinDrag(_id: string, lat: number, lng: number) {
-    setSelected((prev) => (prev ? { ...prev, lat, lng } : prev));
-  }
-
-  // A map click can jump anywhere, bypassing search entirely -- treat it as
-  // a fresh manual placement. Use whatever's currently typed in the search
-  // box as the label if there is any, since ops often types an address
-  // before giving up on search results; otherwise fall back to the
-  // coordinates themselves so delivery_address is never left blank.
   function handleMapClick(lat: number, lng: number) {
     setSelected({
-      placeName: address.trim() || `Custom location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+      placeName: selected?.placeName || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
       lat,
       lng,
     });
   }
 
+  function handlePinDrag(id: string, lat: number, lng: number) {
+    if (id !== "pin") return;
+    setSelected((prev) =>
+      prev ? { ...prev, lat, lng } : { placeName: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng }
+    );
+  }
+
   async function submit() {
-    if (!selected) {
-      showFormError("Please search for and select the delivery address first.");
+    setError(null);
+    setPhoneError(null);
+    if (!customerName.trim()) {
+      showFormError("Customer name is required.");
       return;
     }
     if (!isValidPakistaniMobile(customerPhone)) {
       showPhoneError(PK_MOBILE_HINT);
       return;
     }
+    if (!selected) {
+      showFormError("Pick a delivery location on the map.");
+      return;
+    }
+
     setSubmitting(true);
-    setError(null);
     try {
       const res = await fetch(createEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customer_name: customerName,
+          customer_name: customerName.trim(),
           customer_phone: cleanPhoneInput(customerPhone),
           delivery_address: selected.placeName,
+          address_detail: addressDetail.trim() || null,
           delivery_lat: selected.lat,
           delivery_lng: selected.lng,
-          address_detail: addressDetail,
         }),
       });
       const data = await res.json();
-      if (data.order) {
+      if (res.ok && data.order?.id) {
         if (onCreated) {
           onCreated(data.order.id);
         } else {
@@ -174,11 +184,11 @@ export function NewOrderForm({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
-          <Card title="Customer Information">
+          <MerchantCard title="Customer Information">
             <div className="space-y-4">
               <div>
                 <Label>Full Name</Label>
-                <Input
+                <MerchantInput
                   placeholder="e.g. Fatima Zahra"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
@@ -186,7 +196,7 @@ export function NewOrderForm({
               </div>
               <div>
                 <Label>Pakistani Phone</Label>
-                <Input
+                <MerchantInput
                   ref={phoneInputRef}
                   placeholder="0300-1234567"
                   value={customerPhone}
@@ -208,28 +218,28 @@ export function NewOrderForm({
                 )}
               </div>
             </div>
-          </Card>
+          </MerchantCard>
 
-          <Card title="Delivery Location">
+          <MerchantCard title="Delivery Location">
             <div className="space-y-4">
               <div>
                 <Label>Search Address</Label>
                 <div className="flex gap-2">
-                  <Input
+                  <MerchantInput
                     placeholder="Search Karachi address…"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && searchAddress()}
                     className="flex-1"
                   />
-                  <Button
-                    variant="accent-outline"
+                  <MerchantButton
+                    variant="secondary"
                     onClick={searchAddress}
                     disabled={searching || !address.trim()}
                   >
                     {searching && <Spinner className="h-4 w-4" />}
                     {searching ? "Searching…" : "Search"}
-                  </Button>
+                  </MerchantButton>
                 </div>
               </div>
 
@@ -242,9 +252,10 @@ export function NewOrderForm({
               {candidates.length > 0 && (
                 <div className="animate-fade-in space-y-2">
                   <Label>
-                    {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the right one
+                    {candidates.length} result{candidates.length > 1 ? "s" : ""} found — confirm the
+                    right one
                   </Label>
-                  <Select
+                  <MerchantSelect
                     value={selected ? candidateKey(selected) : ""}
                     onChange={(e) =>
                       setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
@@ -255,29 +266,33 @@ export function NewOrderForm({
                         {c.placeName}
                       </option>
                     ))}
-                  </Select>
+                  </MerchantSelect>
                 </div>
               )}
 
               <div>
                 <Label>Delivery Address</Label>
-                <Input placeholder="Full delivery address" value={selected?.placeName ?? ""} readOnly />
+                <MerchantInput
+                  placeholder="Full delivery address"
+                  value={selected?.placeName ?? ""}
+                  readOnly
+                />
               </div>
 
               <div>
                 <Label>Plot / House / Floor</Label>
-                <Input
+                <MerchantInput
                   placeholder="e.g. House 12, Floor 2, near the mosque…"
                   value={addressDetail}
                   onChange={(e) => setAddressDetail(e.target.value)}
                 />
               </div>
             </div>
-          </Card>
+          </MerchantCard>
         </div>
 
         <div className="space-y-2">
-          <div className="h-80 overflow-hidden rounded-xl border border-white/10 shadow-sm lg:h-full lg:min-h-[420px]">
+          <div className="h-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:h-full lg:min-h-[420px]">
             <TrackingMap
               markers={
                 selected
@@ -289,7 +304,7 @@ export function NewOrderForm({
               onMarkerDrag={handlePinDrag}
             />
           </div>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-slate-400">
             {selected
               ? `📍 ${selected.lat.toFixed(6)}, ${selected.lng.toFixed(6)}`
               : "Click the map or drag the pin to refine the exact delivery location"}
@@ -299,12 +314,12 @@ export function NewOrderForm({
 
       <div className="flex items-center justify-end gap-3">
         <Link href={cancelHref}>
-          <Button variant="accent-outline">Cancel</Button>
+          <MerchantButton variant="secondary">Cancel</MerchantButton>
         </Link>
-        <Button onClick={submit} disabled={submitting || !selected}>
+        <MerchantButton onClick={submit} disabled={submitting || !selected}>
           {submitting && <Spinner className="h-4 w-4" />}
           {submitting ? "Creating…" : "Create Order"}
-        </Button>
+        </MerchantButton>
       </div>
     </div>
   );
