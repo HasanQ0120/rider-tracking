@@ -1,6 +1,6 @@
 # Golootlo ↔ Rider Tracking — Integration Plan
 
-Embed/iframe path was **removed**. Production integration is **API-key based** only: Golootlo Hub backend stores per-merchant keys and proxies to Rider Tracking `/api/v1/*`.
+Embed/iframe path was **removed**. Production integration is **API-key based** only: Golootlo Hub backend stores per-merchant keys and proxies to Rider Tracking API `/api/v1/*` (the **API host**, e.g. `https://api.example.com` / `NEXT_PUBLIC_API_URL` — not the Next.js portal origin).
 
 ---
 

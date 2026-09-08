@@ -6,6 +6,7 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MerchantButton, MerchantCard } from "@/components/merchant/MerchantUi";
 import { apiFetch } from "@/lib/api/browserFetch";
+import { getApiBaseUrl } from "@/lib/api/config";
 
 export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null }) {
   const [prefix, setPrefix] = useState(initialPrefix);
@@ -60,8 +61,7 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
     setTimeout(() => setCopied(false), 1500);
   }
 
-  const endpoint =
-    typeof window !== "undefined" ? `${window.location.origin}/api/v1/orders` : "/api/v1/orders";
+  const endpoint = `${getApiBaseUrl()}/api/v1/orders`;
 
   return (
     <MerchantCard

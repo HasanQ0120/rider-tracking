@@ -1,5 +1,5 @@
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
-import { isValidLoginPin, LOGIN_PIN_HINT } from "@/lib/riderApp/pin";
+import { isValidLoginPin, LOGIN_PIN_HINT } from "@/lib/riderPin";
 
 export type ParsedRider = { name: string; phone: string; license_plate: string; login_pin: string };
 
