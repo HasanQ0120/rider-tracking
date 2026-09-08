@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { MerchantCard, MerchantInput } from "@/components/merchant/MerchantUi";
-import { MerchantSelect } from "@/components/merchant/MerchantUi";
+import { MerchantButton, MerchantCard, MerchantInput, MerchantSelect } from "@/components/merchant/MerchantUi";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap } from "@/components/map/TrackingMap";
-import { apiFetch } from "@/lib/api/browserFetch";
+import { apiFetch, publicApiFetch } from "@/lib/api/browserFetch";
 
 // Fallback starting viewport before any address has been searched or
 // clicked, matching the same constant used for the same reason in
@@ -67,21 +65,28 @@ export function AutoAssignSettings({
     setSearching(true);
     setCandidates([]);
     setSelected(null);
+    setSearched(false);
     try {
-      const res = await apiFetch(`/api/geocode?q=${encodeURIComponent(addressQuery)}`);
-      const data = await res.json();
-      if (data.status !== "ok") {
-        setError("Failed to search for that address.");
+      const res = await publicApiFetch(
+        `/api/geocode?q=${encodeURIComponent(addressQuery.trim())}`
+      );
+      const data = await res.json().catch(() => null);
+      if (res.status === 429 || data?.status === "rate_limited") {
+        setError("Please wait a second and search again (map provider rate limit).");
         return;
       }
-      const results: GeocodeResult[] = data.results;
+      if (!res.ok || data?.status !== "ok") {
+        setError("Failed to search for that address. You can still click the map to place a pin.");
+        return;
+      }
+      const results: GeocodeResult[] = data.results ?? [];
       setCandidates(results);
       if (results[0]) setSelected(results[0]);
+      setSearched(true);
     } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setError("Couldn't reach the server. Check that the API is running, or click the map to place a pin.");
     } finally {
       setSearching(false);
-      setSearched(true);
     }
   }
 
@@ -177,8 +182,8 @@ export function AutoAssignSettings({
               </p>
               <p className="mt-1 text-sm text-slate-900">{pickupAddress}</p>
             </div>
-            <Button
-              variant="accent-outline"
+            <MerchantButton
+              variant="secondary"
               size="sm"
               className="flex-shrink-0"
               onClick={() => {
@@ -196,7 +201,7 @@ export function AutoAssignSettings({
               }}
             >
               {changingPickup ? "Cancel" : "Change"}
-            </Button>
+            </MerchantButton>
           </div>
         )}
         {showPickupSearch && (
@@ -209,33 +214,39 @@ export function AutoAssignSettings({
                 onKeyDown={(e) => e.key === "Enter" && searchAddress()}
                 className="flex-1"
               />
-              <Button
-                variant="accent-outline"
+              <MerchantButton
+                variant="secondary"
                 onClick={searchAddress}
                 disabled={searching || !addressQuery.trim()}
               >
                 {searching && <Spinner className="h-4 w-4" />}
                 {searching ? "Searching…" : "Search"}
-              </Button>
+              </MerchantButton>
             </div>
 
             {searched && !searching && candidates.length === 0 && (
               <StatusBanner tone="warning">No matching address found.</StatusBanner>
             )}
 
-            {candidates.length > 1 && (
-              <MerchantSelect
-                value={selected ? candidateKey(selected) : ""}
-                onChange={(e) =>
-                  setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
-                }
-              >
-                {candidates.map((c) => (
-                  <option key={candidateKey(c)} value={candidateKey(c)}>
-                    {c.placeName}
-                  </option>
-                ))}
-              </MerchantSelect>
+            {candidates.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">
+                  {candidates.length} result{candidates.length > 1 ? "s" : ""} found — pick one from
+                  the list, or click the map to adjust.
+                </p>
+                <MerchantSelect
+                  value={selected ? candidateKey(selected) : ""}
+                  onChange={(e) =>
+                    setSelected(candidates.find((c) => candidateKey(c) === e.target.value) ?? null)
+                  }
+                >
+                  {candidates.map((c) => (
+                    <option key={candidateKey(c)} value={candidateKey(c)}>
+                      {c.placeName}
+                    </option>
+                  ))}
+                </MerchantSelect>
+              </div>
             )}
 
             {selected && (
@@ -249,23 +260,28 @@ export function AutoAssignSettings({
                   />
                 </div>
                 <p className="text-xs text-slate-500">
-                  📍 {selected.lat.toFixed(6)}, {selected.lng.toFixed(6)} — click the map or drag the
-                  pin if this isn't the exact spot.
+                  {selected.lat.toFixed(6)}, {selected.lng.toFixed(6)} — click the map or drag the
+                  pin if this isn&apos;t the exact spot.
                 </p>
-                <Button onClick={savePickup} disabled={saving}>
+                <MerchantButton onClick={savePickup} disabled={saving}>
                   {saving && <Spinner className="h-4 w-4" />}
                   {saving ? "Saving…" : saved ? "Saved!" : "Save Pickup Location"}
-                </Button>
+                </MerchantButton>
               </div>
             )}
 
             {!selected && (
-              <div className="h-64 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                <TrackingMap
-                  markers={[]}
-                  defaultCenter={DEFAULT_MAP_CENTER}
-                  onMapClick={handleMapClick}
-                />
+              <div className="space-y-2">
+                <div className="h-64 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                  <TrackingMap
+                    markers={[]}
+                    defaultCenter={DEFAULT_MAP_CENTER}
+                    onMapClick={handleMapClick}
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Search failed or no results? Click the map to drop a pin, then save.
+                </p>
               </div>
             )}
           </div>

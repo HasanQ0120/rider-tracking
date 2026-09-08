@@ -33,7 +33,7 @@ export default async function MerchantOrderDetailPage({
         riders={data.riders ?? []}
         pin={data.pin ?? null}
         assignEndpoint={`/api/merchant/orders/${id}/assign`}
-        backHref="/merchant"
+        backHref="/merchant/orders"
         showCancelAction={false}
         showResetSessionAction={false}
         showRiderLinks={false}

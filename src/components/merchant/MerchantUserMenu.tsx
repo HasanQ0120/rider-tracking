@@ -37,14 +37,14 @@ export function MerchantUserMenu({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative ml-auto">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-50"
+        className="flex items-center gap-3 rounded-full bg-slate-100 px-2.5 py-1.5 transition-colors hover:bg-slate-200/80"
       >
         <span
-          className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
           style={{ backgroundColor: primaryColor }}
         >
           {initial}

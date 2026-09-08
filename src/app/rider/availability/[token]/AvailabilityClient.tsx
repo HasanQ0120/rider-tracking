@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
+import { publicApiFetch } from "@/lib/api/browserFetch";
 
 type Screen = "loading" | "invalid" | "ready";
 
@@ -15,7 +16,7 @@ export function AvailabilityClient({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/rider/availability/${token}`)
+    publicApiFetch(`/api/rider/availability/${token}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.status !== "ok") {
@@ -33,9 +34,8 @@ export function AvailabilityClient({ token }: { token: string }) {
     const next = !available;
     setSaving(true);
     try {
-      const res = await fetch(`/api/rider/availability/${token}`, {
+      const res = await publicApiFetch(`/api/rider/availability/${token}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ available: next }),
       });
       const data = await res.json().catch(() => null);

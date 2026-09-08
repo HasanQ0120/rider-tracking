@@ -17,6 +17,19 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   return fetch(url, { ...init, headers });
 }
 
+/**
+ * Public token pages (customer / rider web) — no portal JWT.
+ * Auth is the path token only.
+ */
+export async function publicApiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const url = apiUrl(path);
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+  return fetch(url, { ...init, headers });
+}
+
 export function apiUrl(path: string): string {
   const base = getApiBaseUrl();
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;

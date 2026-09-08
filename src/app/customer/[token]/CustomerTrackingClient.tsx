@@ -16,6 +16,7 @@ import {
   MARKER_COLOR_CUSTOMER,
   MARKER_COLOR_RIDER,
 } from "@/lib/config";
+import { publicApiFetch } from "@/lib/api/browserFetch";
 
 type OrderInfo = {
   id: string;
@@ -64,7 +65,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const poll = useCallback(async () => {
     // no-store: the browser itself can also cache a repeated GET to the
     // same URL, on top of the server-side caching fixed in the route.
-    const res = await fetch(`/api/customer/${token}/poll`, { cache: "no-store" });
+    const res = await publicApiFetch(`/api/customer/${token}/poll`, { cache: "no-store" });
     if (res.status !== 200) return;
     const data = await res.json();
     if (data.status !== "ok") return;
@@ -75,7 +76,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
   const init = useCallback(async (attempt = 0) => {
     let data: Record<string, unknown> | null = null;
     try {
-      const res = await fetch(`/api/customer/${token}/init`, { method: "POST" });
+      const res = await publicApiFetch(`/api/customer/${token}/init`, { method: "POST" });
       data = await res.json();
     } catch {
       // Fetch itself failed, or the response wasn't JSON -- a transient
@@ -160,7 +161,7 @@ export function CustomerTrackingClient({ token }: { token: string }) {
 
   const tapComplete = useCallback(async () => {
     setCompleting(true);
-    const res = await fetch(`/api/customer/${token}/complete`, { method: "POST" });
+    const res = await publicApiFetch(`/api/customer/${token}/complete`, { method: "POST" });
     const data = await res.json();
     setCompleting(false);
     if (data.status === "ok" && order) {
@@ -173,10 +174,9 @@ export function CustomerTrackingClient({ token }: { token: string }) {
       if (confirmingResponse) return;
       setConfirmingResponse(response);
       try {
-        const res = await fetch(`/api/customer/${token}/confirm-delivery`, {
+        const res = await publicApiFetch(`/api/customer/${token}/confirm-delivery`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ response }),
+          body: JSON.stringify({ confirmed: response === "yes" }),
         });
         const data = await res.json();
         if (data.resolvedStatus && order) {

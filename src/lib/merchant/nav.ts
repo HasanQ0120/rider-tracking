@@ -1,7 +1,7 @@
 export type MerchantNavItem = {
   href: string;
   label: string;
-  icon: "orders" | "riders" | "settings" | "account";
+  icon: "orders" | "riders" | "settings" | "account" | "dashboard";
 };
 
 export type MerchantNavSection = {
@@ -13,8 +13,9 @@ export const MERCHANT_NAV_SECTIONS: MerchantNavSection[] = [
   {
     label: "Operations",
     items: [
+      { href: "/merchant", label: "Dashboard", icon: "dashboard" },
+      { href: "/merchant/orders", label: "Orders", icon: "orders" },
       { href: "/merchant/riders", label: "Riders", icon: "riders" },
-      { href: "/merchant", label: "Orders", icon: "orders" },
     ],
   },
   {
@@ -36,16 +37,22 @@ export type MerchantRouteMeta = {
 
 export function merchantRouteMeta(pathname: string): MerchantRouteMeta {
   if (pathname.startsWith("/merchant/orders/") && pathname !== "/merchant/orders/new") {
-    return { title: "Order details", breadcrumbs: ["Dashboard", "Orders", "Details"] };
+    return { title: "Order details", breadcrumbs: ["Merchant", "Orders", "Details"] };
+  }
+  if (pathname === "/merchant/orders/new") {
+    return { title: "New order", breadcrumbs: ["Merchant", "Orders", "New"] };
+  }
+  if (pathname === "/merchant/orders") {
+    return { title: "Orders", breadcrumbs: ["Merchant", "Orders"] };
   }
   if (pathname === "/merchant/riders") {
-    return { title: "Riders", breadcrumbs: ["Dashboard", "Riders"] };
+    return { title: "Riders", breadcrumbs: ["Merchant", "Riders"] };
   }
   if (pathname === "/merchant/settings") {
-    return { title: "Settings", breadcrumbs: ["Dashboard", "Settings"] };
+    return { title: "Settings", breadcrumbs: ["Merchant", "Settings"] };
   }
   if (pathname === "/merchant/account") {
-    return { title: "Account", breadcrumbs: ["Dashboard", "Account"] };
+    return { title: "Account", breadcrumbs: ["Merchant", "Account"] };
   }
-  return { title: "Orders", breadcrumbs: ["Dashboard", "Orders"] };
+  return { title: "Dashboard", breadcrumbs: ["Merchant", "Dashboard"] };
 }

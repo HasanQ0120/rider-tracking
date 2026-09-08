@@ -5,23 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MerchantButton, MerchantInput } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
-import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { Logo } from "@/components/ui/Logo";
 import { loginMerchant } from "@/lib/api/auth";
-import { api } from "@/lib/api/client";
-import {
-  DEFAULT_MERCHANT_PRIMARY,
-  DEFAULT_MERCHANT_SECONDARY,
-  normalizeHexColor,
-} from "@/lib/merchant/branding";
+import { PORTAL_THEME } from "@/lib/portalTheme";
 import axios from "axios";
-
-type LoginBranding = {
-  name: string;
-  logoUrl: string | null;
-  primaryColor: string;
-  secondaryColor: string;
-};
 
 function UserIcon() {
   return (
@@ -64,46 +51,12 @@ function MerchantLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [branding, setBranding] = useState<LoginBranding | null>(null);
-
-  const primaryColor = branding?.primaryColor ?? DEFAULT_MERCHANT_PRIMARY;
-  const secondaryColor = branding?.secondaryColor ?? DEFAULT_MERCHANT_SECONDARY;
 
   useEffect(() => {
     if (searchParams.get("error") === "not_authorized") {
       setError("This account isn't provisioned for merchant access, or has been deactivated.");
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    const id = merchantId.trim();
-    if (!id || id.length < 3) {
-      setBranding(null);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const { data } = await api.get("/api/public/tenant-branding", {
-          params: { merchant_id: id },
-        });
-        if (data.status !== "ok") {
-          setBranding(null);
-          return;
-        }
-        setBranding({
-          name: data.name,
-          logoUrl: data.branding.logo_url,
-          primaryColor: normalizeHexColor(data.branding.primary_color, DEFAULT_MERCHANT_PRIMARY),
-          secondaryColor: normalizeHexColor(data.branding.secondary_color, DEFAULT_MERCHANT_SECONDARY),
-        });
-      } catch {
-        setBranding(null);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [merchantId]);
 
   async function submit() {
     setLoading(true);
@@ -131,35 +84,20 @@ function MerchantLoginForm() {
       className="flex min-h-screen flex-col items-center justify-center bg-[#eef1f6] p-6 text-slate-900"
       style={
         {
-          "--merchant-primary": primaryColor,
-          "--merchant-secondary": secondaryColor,
-          "--merchant-accent": secondaryColor,
+          "--merchant-primary": PORTAL_THEME.primary,
+          "--merchant-secondary": PORTAL_THEME.secondary,
+          "--merchant-accent": PORTAL_THEME.accent,
         } as React.CSSProperties
       }
     >
       <div className="mb-6 w-full max-w-md animate-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
+        <div className="h-1.5 w-full" style={{ backgroundColor: PORTAL_THEME.primary }} />
         <div className="px-6 py-6 text-center">
-          {branding ? (
-            <>
-              <div className="flex justify-center">
-                <TenantLogo
-                  name={branding.name}
-                  logoUrl={branding.logoUrl}
-                  size={56}
-                  accentColor={secondaryColor}
-                />
-              </div>
-              <h1 className="mt-4 text-2xl font-bold text-slate-900">{branding.name}</h1>
-              <p className="mt-1 text-sm text-slate-500">Merchant portal</p>
-            </>
-          ) : (
-            <>
-              <Logo size={56} />
-              <h1 className="mt-4 text-2xl font-bold text-slate-900">Rider Tracking</h1>
-              <p className="mt-1 text-sm text-slate-500">Merchant portal</p>
-            </>
-          )}
+          <div className="flex justify-center">
+            <Logo size={56} />
+          </div>
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">Rider Tracking</h1>
+          <p className="mt-1 text-sm text-slate-500">Merchant portal</p>
         </div>
       </div>
 

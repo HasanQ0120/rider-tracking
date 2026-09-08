@@ -5,6 +5,13 @@ import type { MerchantNavSection } from "@/lib/merchant/nav";
 
 function NavIcon({ name }: { name: string }) {
   const cls = "h-4 w-4 shrink-0";
+  if (name === "dashboard") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 13h7V4H4v9zm9 7h7V11h-7v9zM4 20h7v-5H4v5zm9-16v5h7V4h-7z" />
+      </svg>
+    );
+  }
   if (name === "orders") {
     return (
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -41,7 +48,7 @@ function NavIcon({ name }: { name: string }) {
 
 function isActive(href: string, activePath: string) {
   if (href === "/merchant") {
-    return activePath === "/merchant" || activePath.startsWith("/merchant/orders/");
+    return activePath === "/merchant";
   }
   return activePath === href || activePath.startsWith(`${href}/`);
 }
