@@ -1,9 +1,9 @@
 "use client";
 
+import { logoutPortal } from "@/lib/api/auth";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
 
 export function MerchantUserMenu({
   name,
@@ -31,8 +31,7 @@ export function MerchantUserMenu({
   async function logout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    const supabase = createAuthBrowserClient();
-    await supabase.auth.signOut();
+    await logoutPortal();
     router.push("/merchant/login");
     router.refresh();
   }

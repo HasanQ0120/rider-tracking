@@ -7,12 +7,14 @@ import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { Logo } from "@/components/ui/Logo";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { loginMerchant } from "@/lib/api/auth";
+import { api } from "@/lib/api/client";
 import {
   DEFAULT_MERCHANT_PRIMARY,
   DEFAULT_MERCHANT_SECONDARY,
   normalizeHexColor,
 } from "@/lib/merchant/branding";
+import axios from "axios";
 
 type LoginBranding = {
   name: string;
@@ -54,10 +56,6 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
-function merchantIdToEmail(merchantId: string) {
-  return `${merchantId.trim().toLowerCase()}@merchants.internal`;
-}
-
 function MerchantLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,12 +84,9 @@ function MerchantLoginForm() {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/public/tenant-branding?merchant_id=${encodeURIComponent(id)}`);
-        if (!res.ok) {
-          setBranding(null);
-          return;
-        }
-        const data = await res.json();
+        const { data } = await api.get("/api/public/tenant-branding", {
+          params: { merchant_id: id },
+        });
         if (data.status !== "ok") {
           setBranding(null);
           return;
@@ -114,22 +109,18 @@ function MerchantLoginForm() {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: merchantIdToEmail(merchantId),
-        password,
-      });
-      if (signInError) {
-        setError("Invalid Merchant ID or password.");
-        return;
-      }
+      await loginMerchant(merchantId, password);
       const next = searchParams.get("next");
       const safeNext =
         next && next.startsWith("/") && !next.startsWith("//") ? next : "/merchant";
       router.push(safeNext);
       router.refresh();
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError("Invalid Merchant ID or password.");
+      } else {
+        setError("Couldn't reach the server. Is the API running on NEXT_PUBLIC_API_URL?");
+      }
     } finally {
       setLoading(false);
     }

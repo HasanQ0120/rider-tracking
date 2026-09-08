@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { logoutPortal } from "@/lib/api/auth";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -11,9 +11,8 @@ export function LogoutButton() {
   async function logout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    const supabase = createAuthBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/ops/login");
+    await logoutPortal();
+    router.push("/admin/login");
     router.refresh();
   }
 

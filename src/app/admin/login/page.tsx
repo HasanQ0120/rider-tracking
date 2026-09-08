@@ -6,8 +6,10 @@ import { MerchantButton, MerchantCard, MerchantInput } from "@/components/mercha
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { Logo } from "@/components/ui/Logo";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { loginAdmin, logoutPortal } from "@/lib/api/auth";
+import { clearPortalToken } from "@/lib/api/token";
 import { PORTAL_THEME } from "@/lib/portalTheme";
+import axios from "axios";
 
 function MailIcon() {
   return (
@@ -41,26 +43,23 @@ function AdminLoginForm() {
     setError(
       "Your account signed in successfully, but isn't provisioned for platform admin access yet."
     );
-
-    // Still authenticated but not allowlisted — sign out so re-login works
-    // after provisioning without bouncing /admin → login in a loop.
-    void createAuthBrowserClient().auth.signOut();
+    clearPortalToken();
+    void logoutPortal();
   }, [searchParams]);
 
   async function submit() {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        setError(signInError.message || "Sign-in failed.");
-        return;
-      }
+      await loginAdmin(email, password);
       router.push("/admin");
       router.refresh();
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError("Invalid email or password.");
+      } else {
+        setError("Couldn't reach the server. Is the API running on NEXT_PUBLIC_API_URL?");
+      }
     } finally {
       setLoading(false);
     }
