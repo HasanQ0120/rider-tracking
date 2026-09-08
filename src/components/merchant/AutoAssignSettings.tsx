@@ -7,7 +7,7 @@ import { MerchantSelect } from "@/components/merchant/MerchantUi";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { TrackingMap } from "@/components/map/TrackingMap";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 // Fallback starting viewport before any address has been searched or
 // clicked, matching the same constant used for the same reason in
@@ -68,7 +68,7 @@ export function AutoAssignSettings({
     setCandidates([]);
     setSelected(null);
     try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(addressQuery)}`);
+      const res = await apiFetch(`/api/geocode?q=${encodeURIComponent(addressQuery)}`);
       const data = await res.json();
       if (data.status !== "ok") {
         setError("Failed to search for that address.");
@@ -108,16 +108,16 @@ export function AutoAssignSettings({
     setSaving(true);
     setError(null);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error: updateError } = await supabase
-        .from("tenants")
-        .update({
-          default_pickup_address: selected.placeName,
-          default_pickup_lat: selected.lat,
-          default_pickup_lng: selected.lng,
-        })
-        .eq("id", tenantId);
-      if (updateError) {
+      const res = await apiFetch("/api/merchant/settings", {
+        method: "PATCH",
+        body: JSON.stringify({
+          defaultPickupAddress: selected.placeName,
+          defaultPickupLat: selected.lat,
+          defaultPickupLng: selected.lng,
+        }),
+      });
+      const data = await res.json();
+      if (data.status !== "ok") {
         setError("Failed to save pickup location.");
         return;
       }
@@ -144,13 +144,13 @@ export function AutoAssignSettings({
     setTogglingAutoAssign(true);
     setError(null);
     try {
-      const supabase = createAuthBrowserClient();
       const next = !autoAssignEnabled;
-      const { error: updateError } = await supabase
-        .from("tenants")
-        .update({ auto_assign_enabled: next })
-        .eq("id", tenantId);
-      if (updateError) {
+      const res = await apiFetch("/api/merchant/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ autoAssignEnabled: next }),
+      });
+      const data = await res.json();
+      if (data.status !== "ok") {
         setError("Failed to update automatic assignment.");
         return;
       }

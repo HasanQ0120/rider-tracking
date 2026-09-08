@@ -10,7 +10,9 @@ import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { RiderLocationPanel } from "@/components/ops/RiderLocationPanel";
 import { AllRidersMapPanel } from "@/components/ops/AllRidersMapPanel";
+import { apiFetch } from "@/lib/api/browserFetch";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
+import { parseRiderCsvClient } from "@/lib/riderCsvClient";
 import { scrollToError } from "@/lib/scrollToError";
 
 type RowError = { line: number; reason: string };
@@ -173,9 +175,8 @@ export function RidersPanel({
       return;
     }
     setEditSaving(true);
-    const res = await fetch(`${locationEndpointBase}/${editingId}`, {
+    const res = await apiFetch(`${locationEndpointBase}/${editingId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: editName.trim(),
         phone: cleanPhoneInput(editPhone),
@@ -199,9 +200,8 @@ export function RidersPanel({
   // auto-assignment already respects, and is fully reversible.
   async function toggleActive(rider: Rider) {
     setTogglingId(rider.id);
-    const res = await fetch(`${locationEndpointBase}/${rider.id}`, {
+    const res = await apiFetch(`${locationEndpointBase}/${rider.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !rider.active }),
     });
     const data = await res.json();
@@ -226,9 +226,8 @@ export function RidersPanel({
       return;
     }
     setSubmitting(true);
-    const res = await fetch(createEndpoint, {
+    const res = await apiFetch(createEndpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         phone: cleanPhoneInput(phone),
@@ -263,10 +262,15 @@ export function RidersPanel({
     setImporting(true);
     try {
       const csv = await file.text();
-      const res = await fetch(bulkImportEndpoint, {
+      const { valid, errors } = parseRiderCsvClient(csv);
+      if (valid.length === 0 && errors.length > 0) {
+        setImportFileError(errors[0]?.reason ?? "Failed to import this file.");
+        setImporting(false);
+        return;
+      }
+      const res = await apiFetch(bulkImportEndpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv }),
+        body: JSON.stringify({ riders: valid }),
       });
       const data = await res.json();
       if (data.status !== "ok") {
@@ -279,7 +283,16 @@ export function RidersPanel({
           ...riders,
         ]);
       }
-      setImportResult({ imported: data.imported ?? 0, errors: data.errors ?? [] });
+      setImportResult({
+        imported: data.imported ?? data.riders?.length ?? 0,
+        errors: [
+          ...errors,
+          ...(data.errors ?? []).map((e: { index?: number; reason: string }) => ({
+            line: (e.index ?? 0) + 2,
+            reason: e.reason,
+          })),
+        ],
+      });
     } catch {
       setImportFileError("Couldn't reach the server. Check your connection and try again.");
     } finally {

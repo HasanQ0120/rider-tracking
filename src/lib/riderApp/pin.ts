@@ -1,5 +1,3 @@
-import "server-only";
-
 const LOGIN_PIN_REGEX = /^\d{6}$/;
 
 export function isValidLoginPin(pin: unknown): pin is string {

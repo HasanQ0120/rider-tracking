@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MerchantButton, MerchantCard } from "@/components/merchant/MerchantUi";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null }) {
   const [prefix, setPrefix] = useState(initialPrefix);
@@ -19,7 +20,7 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
     setError(null);
     setConfirmOpen(null);
     try {
-      const res = await fetch("/api/merchant/api-key", { method: "POST" });
+      const res = await apiFetch("/api/merchant/api-key", { method: "POST" });
       const data = await res.json();
       if (data.status !== "ok") {
         setError("Failed to generate an API key.");
@@ -38,7 +39,7 @@ export function ApiKeySettings({ initialPrefix }: { initialPrefix: string | null
     setError(null);
     setConfirmOpen(null);
     try {
-      const res = await fetch("/api/merchant/api-key", { method: "DELETE" });
+      const res = await apiFetch("/api/merchant/api-key", { method: "DELETE" });
       const data = await res.json();
       if (data.status !== "ok") {
         setError("Failed to revoke the API key.");

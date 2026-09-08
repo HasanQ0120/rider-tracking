@@ -10,6 +10,7 @@ import {
 } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 export function CreateTenantForm() {
   const router = useRouter();
@@ -28,9 +29,8 @@ export function CreateTenantForm() {
     setCreatedApiKey(null);
 
     try {
-      const res = await fetch("/api/admin/tenants", {
+      const res = await apiFetch("/api/admin/tenants", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
           name,

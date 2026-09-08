@@ -6,6 +6,7 @@ import { MerchantButton, MerchantCard, MerchantInput } from "@/components/mercha
 import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
+import { apiFetch } from "@/lib/api/browserFetch";
 import type { TenantRow } from "@/lib/admin/tenantTypes";
 
 export function TenantBrandingPanel({ tenant: initial }: { tenant: TenantRow }) {
@@ -21,9 +22,8 @@ export function TenantBrandingPanel({ tenant: initial }: { tenant: TenantRow }) 
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primaryColor, secondaryColor, accentColor }),
       });
       const data = await res.json();

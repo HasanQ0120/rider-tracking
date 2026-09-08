@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { TrackingMap, type MapMarker } from "@/components/map/TrackingMap";
+import { apiFetch } from "@/lib/api/browserFetch";
 import { CUSTOMER_POLL_INTERVAL_MS, MARKER_COLOR_TRACKED_RIDER } from "@/lib/config";
 
 type Snapshot = {
@@ -36,7 +37,7 @@ export function RiderLocationPanel({
 
     async function poll() {
       try {
-        const res = await fetch(`${endpointBase}/${riderId}/location`, { cache: "no-store" });
+        const res = await apiFetch(`${endpointBase}/${riderId}/location`);
         const data = await res.json();
         if (data.status !== "ok") {
           setInvalid(true);

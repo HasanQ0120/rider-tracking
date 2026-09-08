@@ -5,7 +5,7 @@ import { MerchantButton, MerchantCard, MerchantInput } from "@/components/mercha
 import { TenantLogo } from "@/components/merchant/TenantLogo";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { apiFetch } from "@/lib/api/browserFetch";
 import {
   DEFAULT_MERCHANT_ACCENT,
   DEFAULT_MERCHANT_PRIMARY,
@@ -52,7 +52,7 @@ export function BrandingSettings({
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch("/api/merchant/branding/logo", { method: "POST", body });
+      const res = await apiFetch("/api/merchant/branding/logo", { method: "POST", body });
       const data = await res.json();
       if (data.status !== "ok" || !data.logo_url) {
         setError(data.message ?? "Could not upload logo.");
@@ -72,7 +72,7 @@ export function BrandingSettings({
     setRemoving(true);
     setError(null);
     try {
-      const res = await fetch("/api/merchant/branding/logo", { method: "DELETE" });
+      const res = await apiFetch("/api/merchant/branding/logo", { method: "DELETE" });
       const data = await res.json();
       if (data.status !== "ok") {
         setError(data.message ?? "Could not remove logo.");
@@ -97,19 +97,17 @@ export function BrandingSettings({
 
     setSaving(true);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error: updateError } = await supabase
-        .from("tenants")
-        .update({
-          logo_url: form.logoUrl.trim() || null,
-          primary_color: form.primaryColor,
-          secondary_color: form.secondaryColor,
-          accent_color: form.accentColor,
-        })
-        .eq("id", tenantId);
-
-      if (updateError) {
-        setError("Could not save branding. Run migration 0029_merchant_branding_grant.sql if this is a new install.");
+      const res = await apiFetch("/api/merchant/branding", {
+        method: "POST",
+        body: JSON.stringify({
+          primaryColor: form.primaryColor,
+          secondaryColor: form.secondaryColor,
+          accentColor: form.accentColor,
+        }),
+      });
+      const data = await res.json();
+      if (data.status !== "ok") {
+        setError(data.message ?? "Could not save branding.");
         return;
       }
 

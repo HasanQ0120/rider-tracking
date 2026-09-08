@@ -1,4 +1,3 @@
-import "server-only";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
 import { isValidLoginPin, LOGIN_PIN_HINT } from "@/lib/riderApp/pin";
 

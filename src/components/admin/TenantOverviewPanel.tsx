@@ -6,6 +6,7 @@ import { useState } from "react";
 import { MerchantButton, MerchantCard, MerchantInput } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
+import { apiFetch } from "@/lib/api/browserFetch";
 import { merchantIdToEmail } from "@/lib/admin/merchantEmail";
 import { tenantStatusLabel, type TenantRow } from "@/lib/admin/tenantTypes";
 
@@ -42,9 +43,8 @@ export function TenantOverviewPanel({
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           contactEmail: contactEmail.trim() || null,
@@ -71,9 +71,8 @@ export function TenantOverviewPanel({
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suspended }),
       });
       const data = await res.json();
@@ -96,9 +95,8 @@ export function TenantOverviewPanel({
     setResettingPassword(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}/reset-password`, {
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}/reset-password`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: newPassword }),
       });
       const data = await res.json();
@@ -120,7 +118,7 @@ export function TenantOverviewPanel({
     setMessage(null);
     setNewApiKey(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}/api-key`, { method: "POST" });
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}/api-key`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setMessage({ tone: "danger", text: data.message ?? "API key generation failed." });
@@ -148,7 +146,7 @@ export function TenantOverviewPanel({
     setApiKeyLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}/api-key`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/tenants/${tenant.id}/api-key`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
         setMessage({ tone: "danger", text: data.message ?? "Revoke failed." });

@@ -13,6 +13,7 @@ import {
 } from "@/components/merchant/MerchantUi";
 import { formatOrderCode } from "@/lib/orderCode";
 import { orderStatusBadgeClasses, orderStatusLabel } from "@/lib/orderStatus";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 type Order = {
   id: string;
@@ -142,9 +143,8 @@ export function OrderDetail({
   async function assign(confirmReassign = false) {
     setBusyAction(confirmReassign ? "reassign" : "assign");
     setMessage(null);
-    const res = await fetch(assignEndpoint, {
+    const res = await apiFetch(assignEndpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ riderId: selectedRider, confirmReassign }),
     });
     const data = await res.json();
@@ -169,7 +169,7 @@ export function OrderDetail({
 
   async function resetSession() {
     setBusyAction("reset");
-    const res = await fetch(resetSessionEndpoint, { method: "POST" });
+    const res = await apiFetch(resetSessionEndpoint, { method: "POST" });
     const data = await res.json();
     setBusyAction(null);
     setMessage(data.status === "ok" ? "Session reset. Rider must re-enter PIN on new device." : `Failed: ${data.status}`);
@@ -177,7 +177,7 @@ export function OrderDetail({
 
   async function cancelOrder() {
     setBusyAction("cancel");
-    const res = await fetch(cancelEndpoint, { method: "POST" });
+    const res = await apiFetch(cancelEndpoint, { method: "POST" });
     if (res.ok) {
       router.refresh();
     } else {

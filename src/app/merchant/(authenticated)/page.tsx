@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
-import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { serverApi } from "@/lib/api/server";
 import { MerchantContentCard, MerchantPageHeader } from "@/components/merchant/MerchantUi";
 import { OrdersTable } from "@/components/ops/OrdersTable";
 
 export default async function MerchantOrdersPage() {
   await requireMerchantUser();
-  const supabase = await createAuthServerClient();
-  const { data: orders } = await supabase
-    .from("orders")
-    .select(
-      "id, customer_name, customer_phone, delivery_address, address_detail, status, tracking_expired_unresolved, delivery_confirmed_by, review_flag_reason, created_at, riders:assigned_rider_id(name, license_plate)"
-    )
-    .order("created_at", { ascending: false });
+  const api = await serverApi("/merchant/login");
+  const { data } = await api.get<{
+    status: string;
+    orders: Parameters<typeof OrdersTable>[0]["orders"];
+  }>("/api/merchant/orders");
 
-  const list = orders ?? [];
+  const list = data.orders ?? [];
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const todayCount = list.filter((o) => new Date(o.created_at) >= startOfDay).length;

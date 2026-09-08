@@ -9,7 +9,7 @@ import {
 } from "@/components/merchant/MerchantUi";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { Spinner } from "@/components/ui/Spinner";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 export function AdminSettingsForm({ email }: { email: string | null }) {
   const [password, setPassword] = useState("");
@@ -30,10 +30,13 @@ export function AdminSettingsForm({ email }: { email: string | null }) {
 
     setSaving(true);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
-        setMessage({ tone: "danger", text: error.message || "Password update failed." });
+      const res = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ tone: "danger", text: data.message || "Password update failed." });
         return;
       }
       setPassword("");

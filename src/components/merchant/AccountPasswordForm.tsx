@@ -4,7 +4,7 @@ import { useState } from "react";
 import { MerchantButton, MerchantInput } from "@/components/merchant/MerchantUi";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { createAuthBrowserClient } from "@/lib/supabase/browserAuth";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 export function AccountPasswordForm() {
   const [password, setPassword] = useState("");
@@ -26,10 +26,13 @@ export function AccountPasswordForm() {
     }
     setSubmitting(true);
     try {
-      const supabase = createAuthBrowserClient();
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) {
-        setError(updateError.message || "Failed to update password.");
+      const res = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Failed to update password.");
         return;
       }
       setPassword("");

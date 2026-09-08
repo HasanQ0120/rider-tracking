@@ -1,13 +1,10 @@
 import { TenantListPanel } from "@/components/admin/TenantListPanel";
-import { TENANT_LIST_SELECT } from "@/lib/admin/tenantTypes";
-import { createServiceClient } from "@/lib/supabase/service";
+import type { TenantRow } from "@/lib/admin/tenantTypes";
+import { serverApi } from "@/lib/api/server";
 
 export default async function AdminTenantsPage() {
-  const service = createServiceClient();
-  const { data: tenants } = await service
-    .from("tenants")
-    .select(TENANT_LIST_SELECT)
-    .order("created_at", { ascending: false });
+  const api = await serverApi("/admin/login");
+  const { data } = await api.get<{ status: string; tenants: TenantRow[] }>("/api/admin/tenants");
 
-  return <TenantListPanel tenants={tenants ?? []} />;
+  return <TenantListPanel tenants={data.tenants ?? []} />;
 }

@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { TenantWorkspaceShell } from "@/components/admin/TenantWorkspaceShell";
-import { TENANT_DETAIL_SELECT } from "@/lib/admin/tenantTypes";
-import { createServiceClient } from "@/lib/supabase/service";
+import type { TenantRow } from "@/lib/admin/tenantTypes";
+import { serverApi } from "@/lib/api/server";
+import axios from "axios";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -10,12 +11,18 @@ type LayoutProps = {
 
 export default async function TenantWorkspaceLayout({ children, params }: LayoutProps) {
   const { id } = await params;
-  const service = createServiceClient();
-  const { data: tenant } = await service
-    .from("tenants")
-    .select(TENANT_DETAIL_SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  const api = await serverApi("/admin/login");
+
+  let tenant: TenantRow | null = null;
+  try {
+    const { data } = await api.get<{ status: string; tenant: TenantRow }>(
+      `/api/admin/tenants/${id}`
+    );
+    tenant = data.tenant ?? null;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) notFound();
+    throw err;
+  }
 
   if (!tenant) notFound();
 

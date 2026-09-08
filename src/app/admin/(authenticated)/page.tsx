@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createServiceClient } from "@/lib/supabase/service";
-import { TENANT_LIST_SELECT } from "@/lib/admin/tenantTypes";
+import { serverApi } from "@/lib/api/server";
+import type { TenantRow } from "@/lib/admin/tenantTypes";
 import {
   MerchantButton,
   MerchantContentCard,
@@ -11,23 +11,30 @@ import { buildOrderCodeMap } from "@/lib/orderCode";
 import { orderStatusBadgeClasses, orderStatusLabel } from "@/lib/orderStatus";
 import { tenantStatusLabel } from "@/lib/admin/tenantTypes";
 
-export default async function AdminDashboardPage() {
-  const service = createServiceClient();
+type DashboardOrder = {
+  id: string;
+  customer_name: string;
+  delivery_address: string;
+  status: string;
+  created_at: string;
+  tenant_id: string | null;
+  tenants: { name: string; merchant_id: string | null } | null;
+  riders: { name: string } | null;
+};
 
-  const [{ data: tenants }, { data: orders }, { count: riderCount }] = await Promise.all([
-    service.from("tenants").select(TENANT_LIST_SELECT).order("created_at", { ascending: false }),
-    service
-      .from("orders")
-      .select(
-        "id, customer_name, delivery_address, status, created_at, tenant_id, tenants:tenant_id(name, merchant_id), riders:assigned_rider_id(name)"
-      )
-      .order("created_at", { ascending: false })
-      .limit(50),
-    service.from("riders").select("id", { count: "exact", head: true }),
+export default async function AdminDashboardPage() {
+  const api = await serverApi("/admin/login");
+
+  const [{ data: tenantsRes }, { data: ordersRes }] = await Promise.all([
+    api.get<{ status: string; tenants: TenantRow[] }>("/api/admin/tenants"),
+    api.get<{ status: string; orders: DashboardOrder[]; rider_count: number }>(
+      "/api/admin/orders?limit=50"
+    ),
   ]);
 
-  const tenantList = tenants ?? [];
-  const orderList = orders ?? [];
+  const tenantList = tenantsRes.tenants ?? [];
+  const orderList = ordersRes.orders ?? [];
+  const riderCount = ordersRes.rider_count ?? 0;
   const codeMap = buildOrderCodeMap(orderList);
 
   const activeTenants = tenantList.filter((t) => !t.suspended_at && t.active).length;
@@ -73,7 +80,7 @@ export default async function AdminDashboardPage() {
         <MerchantContentCard
           className="lg:col-span-2"
           title="Recent orders"
-          subtitle={`${riderCount ?? 0} riders registered platform-wide`}
+          subtitle={`${riderCount} riders registered platform-wide`}
           action={
             <Link
               href="/admin/tenants"
