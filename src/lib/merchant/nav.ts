@@ -1,7 +1,7 @@
 export type MerchantNavItem = {
   href: string;
   label: string;
-  icon: "orders" | "riders" | "settings" | "account" | "dashboard";
+  icon: "orders" | "riders" | "branches" | "settings" | "account" | "dashboard";
 };
 
 export type MerchantNavSection = {
@@ -16,6 +16,7 @@ export const MERCHANT_NAV_SECTIONS: MerchantNavSection[] = [
       { href: "/merchant", label: "Dashboard", icon: "dashboard" },
       { href: "/merchant/orders", label: "Orders", icon: "orders" },
       { href: "/merchant/riders", label: "Riders", icon: "riders" },
+      { href: "/merchant/branches", label: "Branches", icon: "branches" },
     ],
   },
   {
@@ -47,6 +48,9 @@ export function merchantRouteMeta(pathname: string): MerchantRouteMeta {
   }
   if (pathname === "/merchant/riders") {
     return { title: "Riders", breadcrumbs: ["Merchant", "Riders"] };
+  }
+  if (pathname === "/merchant/branches") {
+    return { title: "Branches", breadcrumbs: ["Merchant", "Branches"] };
   }
   if (pathname === "/merchant/settings") {
     return { title: "Settings", breadcrumbs: ["Merchant", "Settings"] };

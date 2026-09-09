@@ -13,9 +13,11 @@ type RiderRow = {
   active: boolean;
   available: boolean;
   availability_token?: string | null;
+  branch_id?: string | null;
   created_at: string;
 };
 
+type BranchRow = { id: string; name: string; code: string; active: boolean };
 type OrderCountRow = { assigned_rider_id: string | null; status: string };
 
 export default async function TenantRidersPage({ params }: PageProps) {
@@ -23,9 +25,10 @@ export default async function TenantRidersPage({ params }: PageProps) {
   const api = await serverApi("/admin/login");
 
   try {
-    const [{ data: ridersRes }, { data: ordersRes }] = await Promise.all([
+    const [{ data: ridersRes }, { data: ordersRes }, { data: branchesRes }] = await Promise.all([
       api.get<{ riders: RiderRow[] }>(`/api/admin/tenants/${id}/riders`),
       api.get<{ status: string; orders: OrderCountRow[] }>(`/api/admin/tenants/${id}/orders`),
+      api.get<{ status: string; branches: BranchRow[] }>(`/api/admin/tenants/${id}/branches`),
     ]);
 
     const counts = new Map<string, { delivered: number; active: number }>();
@@ -49,6 +52,7 @@ export default async function TenantRidersPage({ params }: PageProps) {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <RidersPanel
           initialRiders={ridersWithCounts}
+          branches={branchesRes.branches ?? []}
           createEndpoint={base}
           bulkImportEndpoint={`${base}/bulk`}
           locationEndpointBase={base}

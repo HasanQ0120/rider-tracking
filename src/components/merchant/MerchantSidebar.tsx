@@ -30,6 +30,17 @@ function NavIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "branches") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 3v18" />
+        <path d="M12 8c4 0 6-2 7-4" />
+        <path d="M12 14c4 0 6 2 7 4" />
+        <path d="M12 11c-4 0-6-2-7-4" />
+        <path d="M12 17c-4 0-6 2-7 4" />
+      </svg>
+    );
+  }
   if (name === "settings") {
     return (
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

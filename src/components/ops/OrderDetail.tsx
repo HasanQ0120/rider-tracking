@@ -24,6 +24,7 @@ type Order = {
   delivery_lng: number | null;
   status: string;
   assigned_rider_id: string | null;
+  branch_id?: string | null;
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by: string | null;
   review_flag_reason: string | null;
@@ -325,6 +326,11 @@ export function OrderDetail({
             (merchantMode ? (
               <div className={sectionCls}>
                 <h2 className="mb-4 font-semibold text-slate-900">Assign Rider</h2>
+                {order.branch_id ? (
+                  <p className="mb-3 text-xs text-slate-500">
+                    Showing riders for this order&apos;s branch only.
+                  </p>
+                ) : null}
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <MerchantSelect
                     className="flex-1"
@@ -366,6 +372,11 @@ export function OrderDetail({
               </div>
             ) : (
             <OpsCard title="Assign Rider">
+              {order.branch_id ? (
+                <p className="mb-3 text-xs text-slate-500">
+                  Showing riders for this order&apos;s branch only.
+                </p>
+              ) : null}
               <div className="flex gap-2">
                 <OpsSelect
                   className="flex-1"

@@ -11,18 +11,21 @@ type RiderRow = {
   active: boolean;
   available: boolean;
   availability_token?: string | null;
+  branch_id?: string | null;
   created_at: string;
 };
 
+type BranchRow = { id: string; name: string; code: string; active: boolean };
 type OrderCountRow = { assigned_rider_id: string | null; status: string };
 
 export default async function MerchantRidersPage() {
   await requireMerchantUser();
   const api = await serverApi("/merchant/login");
 
-  const [{ data: ridersRes }, { data: ordersRes }] = await Promise.all([
+  const [{ data: ridersRes }, { data: ordersRes }, { data: branchesRes }] = await Promise.all([
     api.get<{ status: string; riders: RiderRow[] }>("/api/merchant/riders"),
     api.get<{ status: string; orders: OrderCountRow[] }>("/api/merchant/orders"),
+    api.get<{ status: string; branches: BranchRow[] }>("/api/merchant/branches"),
   ]);
 
   const counts = new Map<string, { delivered: number; active: number }>();
@@ -58,6 +61,7 @@ export default async function MerchantRidersPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <RidersPanel
           initialRiders={ridersWithCounts}
+          branches={branchesRes.branches ?? []}
           createEndpoint="/api/merchant/riders"
           bulkImportEndpoint="/api/merchant/riders/bulk"
           locationEndpointBase="/api/merchant/riders"
