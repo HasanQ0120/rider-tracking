@@ -1,20 +1,35 @@
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
-import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { serverApi } from "@/lib/api/server";
 import { MerchantPageHeader } from "@/components/merchant/MerchantUi";
 import { RidersPanel } from "@/components/ops/RidersPanel";
 
+type RiderRow = {
+  id: string;
+  name: string;
+  phone: string;
+  license_plate: string | null;
+  active: boolean;
+  available: boolean;
+  availability_token?: string | null;
+  branch_id?: string | null;
+  created_at: string;
+};
+
+type BranchRow = { id: string; name: string; code: string; active: boolean };
+type OrderCountRow = { assigned_rider_id: string | null; status: string };
+
 export default async function MerchantRidersPage() {
   await requireMerchantUser();
-  const supabase = await createAuthServerClient();
-  const { data: riders } = await supabase
-    .from("riders")
-    .select("id, name, phone, license_plate, active, available, availability_token, created_at")
-    .order("created_at", { ascending: false });
+  const api = await serverApi("/merchant/login");
 
-  const { data: orders } = await supabase.from("orders").select("assigned_rider_id, status");
+  const [{ data: ridersRes }, { data: ordersRes }, { data: branchesRes }] = await Promise.all([
+    api.get<{ status: string; riders: RiderRow[] }>("/api/merchant/riders"),
+    api.get<{ status: string; orders: OrderCountRow[] }>("/api/merchant/orders"),
+    api.get<{ status: string; branches: BranchRow[] }>("/api/merchant/branches"),
+  ]);
 
   const counts = new Map<string, { delivered: number; active: number }>();
-  for (const o of orders ?? []) {
+  for (const o of ordersRes.orders ?? []) {
     if (!o.assigned_rider_id) continue;
     const entry = counts.get(o.assigned_rider_id) ?? { delivered: 0, active: 0 };
     if (o.status === "delivered") entry.delivered += 1;
@@ -22,7 +37,7 @@ export default async function MerchantRidersPage() {
     counts.set(o.assigned_rider_id, entry);
   }
 
-  const ridersWithCounts = (riders ?? []).map((r) => ({
+  const ridersWithCounts = (ridersRes.riders ?? []).map((r) => ({
     ...r,
     deliveredCount: counts.get(r.id)?.delivered ?? 0,
     activeCount: counts.get(r.id)?.active ?? 0,
@@ -46,6 +61,7 @@ export default async function MerchantRidersPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <RidersPanel
           initialRiders={ridersWithCounts}
+          branches={branchesRes.branches ?? []}
           createEndpoint="/api/merchant/riders"
           bulkImportEndpoint="/api/merchant/riders/bulk"
           locationEndpointBase="/api/merchant/riders"

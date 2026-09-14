@@ -1,33 +1,31 @@
 import type { Metadata } from "next";
-import { createServiceClient } from "@/lib/supabase/service";
+import { apiUrl } from "@/lib/api/browserFetch";
 import { CustomerTrackingClient } from "./CustomerTrackingClient";
 
 // Purely for the link-preview card (WhatsApp, etc.) -- a plain read with no
 // gating on tracking_tokens.active and no device-lock/session table
-// touched at all, so it can't ever "consume" anything. This runs as
-// ordinary Server Component metadata generation, entirely separate from
-// (and unable to trigger) the client-side useEffect that does the actual
-// tracking-session logic below.
+// touched at all, so it can't ever "consume" anything.
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ token: string }>;
 }): Promise<Metadata> {
   const { token } = await params;
-  const supabase = createServiceClient();
-  const { data: tokenRow } = await supabase
-    .from("tracking_tokens")
-    .select("order_id")
-    .eq("token", token)
-    .eq("type", "customer")
-    .maybeSingle();
-
-  const { data: order } = tokenRow
-    ? await supabase.from("orders").select("customer_name").eq("id", tokenRow.order_id).single()
-    : { data: null };
+  let customerName: string | null = null;
+  try {
+    const res = await fetch(apiUrl(`/api/customer/${token}/preview`), {
+      next: { revalidate: 60 },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { customer_name?: string | null };
+      customerName = data.customer_name ?? null;
+    }
+  } catch {
+    // Fall through to generic title
+  }
 
   return {
-    title: order ? `Track your delivery, ${order.customer_name}` : "Rider Tracking",
+    title: customerName ? `Track your delivery, ${customerName}` : "Rider Tracking",
     description: "Track your delivery live.",
   };
 }

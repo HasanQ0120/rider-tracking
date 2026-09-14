@@ -4,13 +4,15 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { MerchantCard, MerchantInput, MerchantButton } from "@/components/merchant/MerchantUi";
+import { MerchantCard, MerchantInput, MerchantButton, MerchantSelect } from "@/components/merchant/MerchantUi";
 import { useMerchantSearch } from "@/components/merchant/MerchantSearchContext";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBanner } from "@/components/ui/StatusBanner";
 import { RiderLocationPanel } from "@/components/ops/RiderLocationPanel";
 import { AllRidersMapPanel } from "@/components/ops/AllRidersMapPanel";
+import { apiFetch } from "@/lib/api/browserFetch";
 import { cleanPhoneInput, isValidPakistaniMobile, PK_MOBILE_HINT } from "@/lib/phone";
+import { parseRiderCsvClient } from "@/lib/riderCsvClient";
 import { scrollToError } from "@/lib/scrollToError";
 
 type RowError = { line: number; reason: string };
@@ -24,16 +26,27 @@ type Rider = {
   active: boolean;
   available?: boolean;
   availability_token?: string | null;
+  branch_id?: string | null;
   created_at: string;
   deliveredCount?: number;
   activeCount?: number;
 };
 
+type BranchOption = { id: string; name: string; code: string; active: boolean };
+
 type MapMode = { kind: "closed" } | { kind: "all" } | { kind: "single"; riderId: string };
 
 // Avatar + name/phone/plate -- shared between each list row and the
 // single-rider detail card so the two views never drift out of sync.
-function RiderInfo({ r, light }: { r: Rider; light?: boolean }) {
+function RiderInfo({
+  r,
+  light,
+  branchLabel,
+}: {
+  r: Rider;
+  light?: boolean;
+  branchLabel?: string | null;
+}) {
   return (
     <div className="flex items-center gap-3">
       <div
@@ -55,6 +68,9 @@ function RiderInfo({ r, light }: { r: Rider; light?: boolean }) {
             </span>
           )}
         </p>
+        {branchLabel ? (
+          <p className={`mt-0.5 text-xs ${light ? "text-slate-400" : "text-white/40"}`}>{branchLabel}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -103,6 +119,7 @@ function RiderBadges({ r, light }: { r: Rider; light?: boolean }) {
 
 export function RidersPanel({
   initialRiders,
+  branches = [],
   createEndpoint = "/api/ops/riders",
   bulkImportEndpoint = "/api/ops/riders/bulk",
   locationEndpointBase = "/api/ops/riders",
@@ -110,6 +127,8 @@ export function RidersPanel({
   layout = "default",
 }: {
   initialRiders: Rider[];
+  /** When provided, create/import require a branch and list can filter. */
+  branches?: BranchOption[];
   createEndpoint?: string;
   bulkImportEndpoint?: string;
   locationEndpointBase?: string;
@@ -121,6 +140,10 @@ export function RidersPanel({
   const PanelCard = isLight ? MerchantCard : Card;
   const PanelInput = isLight ? MerchantInput : Input;
   const [riders, setRiders] = useState(initialRiders);
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [createBranchId, setCreateBranchId] = useState(
+    () => branches.find((b) => b.active && b.code === "main")?.id ?? branches.find((b) => b.active)?.id ?? ""
+  );
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>({ kind: "closed" });
@@ -173,9 +196,8 @@ export function RidersPanel({
       return;
     }
     setEditSaving(true);
-    const res = await fetch(`${locationEndpointBase}/${editingId}`, {
+    const res = await apiFetch(`${locationEndpointBase}/${editingId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: editName.trim(),
         phone: cleanPhoneInput(editPhone),
@@ -199,9 +221,8 @@ export function RidersPanel({
   // auto-assignment already respects, and is fully reversible.
   async function toggleActive(rider: Rider) {
     setTogglingId(rider.id);
-    const res = await fetch(`${locationEndpointBase}/${rider.id}`, {
+    const res = await apiFetch(`${locationEndpointBase}/${rider.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !rider.active }),
     });
     const data = await res.json();
@@ -225,15 +246,19 @@ export function RidersPanel({
       setLoginPinError("Login PIN must be exactly 6 digits.");
       return;
     }
+    if (branches.length > 0 && !createBranchId) {
+      setLoginPinError("Select a branch for this rider.");
+      return;
+    }
     setSubmitting(true);
-    const res = await fetch(createEndpoint, {
+    const res = await apiFetch(createEndpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         phone: cleanPhoneInput(phone),
         license_plate: licensePlate.trim(),
         login_pin: loginPin.trim(),
+        ...(createBranchId ? { branch_id: createBranchId } : {}),
       }),
     });
     const data = await res.json();
@@ -263,10 +288,18 @@ export function RidersPanel({
     setImporting(true);
     try {
       const csv = await file.text();
-      const res = await fetch(bulkImportEndpoint, {
+      const { valid, errors } = parseRiderCsvClient(csv);
+      if (valid.length === 0 && errors.length > 0) {
+        setImportFileError(errors[0]?.reason ?? "Failed to import this file.");
+        setImporting(false);
+        return;
+      }
+      const res = await apiFetch(bulkImportEndpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv }),
+        body: JSON.stringify({
+          riders: valid,
+          ...(createBranchId ? { branch_id: createBranchId } : {}),
+        }),
       });
       const data = await res.json();
       if (data.status !== "ok") {
@@ -279,7 +312,16 @@ export function RidersPanel({
           ...riders,
         ]);
       }
-      setImportResult({ imported: data.imported ?? 0, errors: data.errors ?? [] });
+      setImportResult({
+        imported: data.imported ?? data.riders?.length ?? 0,
+        errors: [
+          ...errors,
+          ...(data.errors ?? []).map((e: { index?: number; reason: string }) => ({
+            line: (e.index ?? 0) + 2,
+            reason: e.reason,
+          })),
+        ],
+      });
     } catch {
       setImportFileError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -357,6 +399,7 @@ export function RidersPanel({
   }
 
   const filteredRiders = riders.filter((r) => {
+    if (branchFilter !== "all" && r.branch_id !== branchFilter) return false;
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       const haystack = [r.name, r.phone, r.license_plate ?? ""].join(" ").toLowerCase();
@@ -364,6 +407,9 @@ export function RidersPanel({
     }
     return true;
   });
+
+  const branchNameById = new Map(branches.map((b) => [b.id, `${b.name} (${b.code})`]));
+  const activeBranches = branches.filter((b) => b.active);
 
   const mapOpen = mapMode.kind !== "closed";
 
@@ -376,6 +422,35 @@ export function RidersPanel({
       }
     >
       <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        {branches.length > 0 ? (
+          isLight ? (
+            <MerchantSelect
+              className="mr-auto max-w-xs"
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+            >
+              <option value="all">All branches</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.code}){!b.active ? " — inactive" : ""}
+                </option>
+              ))}
+            </MerchantSelect>
+          ) : (
+            <select
+              className="mr-auto max-w-xs rounded-lg border border-white/10 bg-brand-navy px-3 py-2 text-sm text-white"
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+            >
+              <option value="all">All branches</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.code})
+                </option>
+              ))}
+            </select>
+          )
+        ) : null}
         {isLight ? (
           <>
             <MerchantButton
@@ -440,6 +515,37 @@ export function RidersPanel({
             <code className={isLight ? "text-slate-700" : "text-white/70"}>login_pin</code> (any column order, header row
             required).
           </p>
+          {activeBranches.length > 0 ? (
+            <div className="mb-3">
+              <label className={`mb-1 block text-xs font-medium ${isLight ? "text-slate-600" : "text-white/60"}`}>
+                Import into branch
+              </label>
+              {isLight ? (
+                <MerchantSelect
+                  value={createBranchId}
+                  onChange={(e) => setCreateBranchId(e.target.value)}
+                >
+                  {activeBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code})
+                    </option>
+                  ))}
+                </MerchantSelect>
+              ) : (
+                <select
+                  className="w-full rounded-lg border border-white/10 bg-brand-navy px-3 py-2 text-sm text-white"
+                  value={createBranchId}
+                  onChange={(e) => setCreateBranchId(e.target.value)}
+                >
+                  {activeBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : null}
           {importFileError && (
             <div className="mb-3">
               <StatusBanner tone="danger">{importFileError}</StatusBanner>
@@ -493,6 +599,32 @@ export function RidersPanel({
       {showAddForm && (
         <PanelCard title="Add Rider" className="animate-slide-up">
           <div className="space-y-3">
+            {activeBranches.length > 0 ? (
+              isLight ? (
+                <MerchantSelect
+                  value={createBranchId}
+                  onChange={(e) => setCreateBranchId(e.target.value)}
+                >
+                  {activeBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code})
+                    </option>
+                  ))}
+                </MerchantSelect>
+              ) : (
+                <select
+                  className="w-full rounded-lg border border-white/10 bg-brand-navy px-3 py-2 text-sm text-white"
+                  value={createBranchId}
+                  onChange={(e) => setCreateBranchId(e.target.value)}
+                >
+                  {activeBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code})
+                    </option>
+                  ))}
+                </select>
+              )
+            ) : null}
             <PanelInput placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
             <div>
               <PanelInput
@@ -606,7 +738,15 @@ export function RidersPanel({
                 renderEditForm()
               ) : (
                 <>
-                  <RiderInfo r={selectedRider} light={isLight} />
+                  <RiderInfo
+                    r={selectedRider}
+                    light={isLight}
+                    branchLabel={
+                      selectedRider.branch_id
+                        ? branchNameById.get(selectedRider.branch_id) ?? null
+                        : null
+                    }
+                  />
                   <RiderBadges r={selectedRider} light={isLight} />
                   <div className="flex flex-wrap gap-2">
                     {selectedRider.availability_token &&
@@ -655,7 +795,11 @@ export function RidersPanel({
                     renderEditForm()
                   ) : (
                     <>
-                      <RiderInfo r={r} light={isLight} />
+                      <RiderInfo
+                        r={r}
+                        light={isLight}
+                        branchLabel={r.branch_id ? branchNameById.get(r.branch_id) ?? null : null}
+                      />
                       <RiderBadges r={r} light={isLight} />
                       <div className="flex flex-wrap gap-2">
                         {r.availability_token &&
@@ -717,6 +861,7 @@ export function RidersPanel({
                 riderName={selectedRider.name}
                 endpointBase={locationEndpointBase}
                 onClose={() => setMapMode(mapOpen && mapMode.kind === "single" ? { kind: "all" } : { kind: "closed" })}
+                variant={isLight ? "light" : "dark"}
               />
             ) : null}
           </div>

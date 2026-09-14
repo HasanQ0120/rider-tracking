@@ -1,24 +1,25 @@
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
-import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { serverApi } from "@/lib/api/server";
 import { AccountPasswordForm } from "@/components/merchant/AccountPasswordForm";
 import { MerchantPageHeader } from "@/components/merchant/MerchantUi";
 import { TenantLogo } from "@/components/merchant/TenantLogo";
 
 export default async function MerchantAccountPage() {
   const merchant = await requireMerchantUser();
-  const supabase = await createAuthServerClient();
+  const api = await serverApi("/merchant/login");
 
-  const { count: riderCount } = await supabase
-    .from("riders")
-    .select("id", { count: "exact", head: true });
+  const [{ data: ridersRes }, { data: ordersRes }] = await Promise.all([
+    api.get<{ status: string; riders: { id: string }[] }>("/api/merchant/riders"),
+    api.get<{ status: string; orders: { created_at: string }[] }>("/api/merchant/orders"),
+  ]);
 
+  const riderCount = ridersRes.riders?.length ?? 0;
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
-  const { count: monthOrders } = await supabase
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", startOfMonth.toISOString());
+  const monthOrders = (ordersRes.orders ?? []).filter(
+    (o) => new Date(o.created_at) >= startOfMonth
+  ).length;
 
   return (
     <>
@@ -52,13 +53,13 @@ export default async function MerchantAccountPage() {
           <div className="grid divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             <div className="px-6 py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Riders</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{riderCount ?? 0}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{riderCount}</p>
             </div>
             <div className="px-6 py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Orders this month
               </p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{monthOrders ?? 0}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{monthOrders}</p>
             </div>
             <div className="px-6 py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

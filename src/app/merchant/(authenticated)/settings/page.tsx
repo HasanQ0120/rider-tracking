@@ -1,5 +1,5 @@
 import { requireMerchantUser } from "@/lib/merchant/authGuard";
-import { createAuthServerClient } from "@/lib/supabase/serverAuth";
+import { serverApi } from "@/lib/api/server";
 import { AutoAssignSettings } from "@/components/merchant/AutoAssignSettings";
 import { ApiKeySettings } from "@/components/merchant/ApiKeySettings";
 import { BrandingSettings } from "@/components/merchant/BrandingSettings";
@@ -8,14 +8,24 @@ import { MerchantSettingsSidebar } from "@/components/merchant/MerchantSettingsS
 
 export default async function MerchantSettingsPage() {
   const merchant = await requireMerchantUser();
-  const supabase = await createAuthServerClient();
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select(
-      "id, auto_assign_enabled, default_pickup_address, default_pickup_lat, default_pickup_lng, api_key_prefix, logo_url, primary_color, secondary_color, accent_color"
-    )
-    .eq("id", merchant.tenantId)
-    .single();
+  const api = await serverApi("/merchant/login");
+  const { data } = await api.get<{
+    status: string;
+    settings: {
+      id: string;
+      auto_assign_enabled: boolean;
+      default_pickup_address: string | null;
+      default_pickup_lat: number | null;
+      default_pickup_lng: number | null;
+      api_key_prefix: string | null;
+      logo_url: string | null;
+      primary_color: string;
+      secondary_color: string;
+      accent_color: string;
+    };
+  }>("/api/merchant/settings");
+
+  const tenant = data.settings;
 
   return (
     <>
@@ -29,9 +39,9 @@ export default async function MerchantSettingsPage() {
               tenantName={merchant.name}
               initial={{
                 logoUrl: tenant?.logo_url ?? "",
-                primaryColor: merchant.branding.primaryColor,
-                secondaryColor: merchant.branding.secondaryColor,
-                accentColor: merchant.branding.accentColor,
+                primaryColor: tenant?.primary_color ?? merchant.branding.primaryColor,
+                secondaryColor: tenant?.secondary_color ?? merchant.branding.secondaryColor,
+                accentColor: tenant?.accent_color ?? merchant.branding.accentColor,
               }}
             />
           </div>

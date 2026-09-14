@@ -18,6 +18,7 @@ import {
   MARKER_COLOR_RIDER,
   PROXIMITY_RADIUS_M,
 } from "@/lib/config";
+import { publicApiFetch } from "@/lib/api/browserFetch";
 
 type Screen =
   | "loading"
@@ -53,9 +54,8 @@ type OrderInfo = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function postJson(url: string, body: unknown): Promise<{ res: Response | null; data: any }> {
   try {
-    const res = await fetch(url, {
+    const res = await publicApiFetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     return { res, data: await res.json().catch(() => ({})) };

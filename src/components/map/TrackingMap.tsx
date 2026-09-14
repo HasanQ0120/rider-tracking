@@ -5,6 +5,7 @@ import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { haversineMeters } from "@/lib/geo";
 import { ROUTE_REFETCH_MIN_DISTANCE_M, ROUTE_REFETCH_MIN_INTERVAL_MS, MARKER_MIN_MOVEMENT_M } from "@/lib/config";
+import { publicApiFetch } from "@/lib/api/browserFetch";
 
 export type MapMarker = {
   id: string;
@@ -432,7 +433,7 @@ export function TrackingMap({
       toLat: String(routeTo.lat),
       toLng: String(routeTo.lng),
     });
-    fetch(`/api/directions?${params}`)
+    publicApiFetch(`/api/directions?${params}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.status !== "ok" || !mapRef.current) return;

@@ -1,49 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { jwtVerify } from "jose";
+import { SESSION_COOKIE } from "@/lib/api/config";
 
-// Gates /ops/*, /merchant/*, and /admin/* on a logged-in Supabase Auth
-// session. Whether that user is actually provisioned (ops_staff row,
-// merchant app_metadata claim, or platform_admins row) is checked
-// separately in each area's own layout/API routes.
+async function hasValidSession(token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  const secret = process.env.SESSION_JWT_SECRET;
+  if (!secret) return Boolean(token);
+  try {
+    await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ["HS256"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Gates /merchant/* and /admin/* on rider-tracking-api portal JWT (cookie rt_session).
+// /ops/* permanently redirects into Admin.
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const { data } = await supabase.auth.getUser();
-
   const pathname = request.nextUrl.pathname;
-  const loginPath = pathname.startsWith("/merchant")
-    ? "/merchant/login"
-    : pathname.startsWith("/admin")
-      ? "/admin/login"
-      : "/ops/login";
+
+  if (pathname === "/ops" || pathname.startsWith("/ops/")) {
+    const url = request.nextUrl.clone();
+    if (pathname.startsWith("/ops/login")) {
+      url.pathname = "/admin/login";
+    } else {
+      url.pathname = "/admin";
+    }
+    return NextResponse.redirect(url);
+  }
+
+  const loginPath = pathname.startsWith("/merchant") ? "/merchant/login" : "/admin/login";
   const isLoginPage = pathname === loginPath;
-  if (!data.user && !isLoginPage) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const authed = await hasValidSession(token);
+
+  if (!authed && !isLoginPage) {
     const url = request.nextUrl.clone();
     url.pathname = loginPath;
     return NextResponse.redirect(url);
   }
 
-  return response;
+  if (authed && isLoginPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.startsWith("/merchant") ? "/merchant" : "/admin";
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/ops/:path*", "/merchant/:path*", "/admin/:path*"],
+  matcher: ["/ops/:path*", "/ops", "/merchant/:path*", "/admin/:path*"],
 };

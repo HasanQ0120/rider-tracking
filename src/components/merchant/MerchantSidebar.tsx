@@ -5,6 +5,13 @@ import type { MerchantNavSection } from "@/lib/merchant/nav";
 
 function NavIcon({ name }: { name: string }) {
   const cls = "h-4 w-4 shrink-0";
+  if (name === "dashboard") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 13h7V4H4v9zm9 7h7V11h-7v9zM4 20h7v-5H4v5zm9-16v5h7V4h-7z" />
+      </svg>
+    );
+  }
   if (name === "orders") {
     return (
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -20,6 +27,17 @@ function NavIcon({ name }: { name: string }) {
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="8" r="4" />
         <path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />
+      </svg>
+    );
+  }
+  if (name === "branches") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 3v18" />
+        <path d="M12 8c4 0 6-2 7-4" />
+        <path d="M12 14c4 0 6 2 7 4" />
+        <path d="M12 11c-4 0-6-2-7-4" />
+        <path d="M12 17c-4 0-6 2-7 4" />
       </svg>
     );
   }
@@ -41,7 +59,7 @@ function NavIcon({ name }: { name: string }) {
 
 function isActive(href: string, activePath: string) {
   if (href === "/merchant") {
-    return activePath === "/merchant" || activePath.startsWith("/merchant/orders/");
+    return activePath === "/merchant";
   }
   return activePath === href || activePath.startsWith(`${href}/`);
 }

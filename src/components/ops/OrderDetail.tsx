@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
 import { StatusBanner } from "@/components/ui/StatusBanner";
-import { Card } from "@/components/ui/Card";
-import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  MerchantButton,
+  MerchantCard,
+  MerchantSelect,
+} from "@/components/merchant/MerchantUi";
 import { formatOrderCode } from "@/lib/orderCode";
 import { orderStatusBadgeClasses, orderStatusLabel } from "@/lib/orderStatus";
+import { apiFetch } from "@/lib/api/browserFetch";
 
 type Order = {
   id: string;
@@ -21,6 +24,7 @@ type Order = {
   delivery_lng: number | null;
   status: string;
   assigned_rider_id: string | null;
+  branch_id?: string | null;
   tracking_expired_unresolved: boolean;
   delivery_confirmed_by: string | null;
   review_flag_reason: string | null;
@@ -139,9 +143,8 @@ export function OrderDetail({
   async function assign(confirmReassign = false) {
     setBusyAction(confirmReassign ? "reassign" : "assign");
     setMessage(null);
-    const res = await fetch(assignEndpoint, {
+    const res = await apiFetch(assignEndpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ riderId: selectedRider, confirmReassign }),
     });
     const data = await res.json();
@@ -166,7 +169,7 @@ export function OrderDetail({
 
   async function resetSession() {
     setBusyAction("reset");
-    const res = await fetch(resetSessionEndpoint, { method: "POST" });
+    const res = await apiFetch(resetSessionEndpoint, { method: "POST" });
     const data = await res.json();
     setBusyAction(null);
     setMessage(data.status === "ok" ? "Session reset. Rider must re-enter PIN on new device." : `Failed: ${data.status}`);
@@ -174,7 +177,7 @@ export function OrderDetail({
 
   async function cancelOrder() {
     setBusyAction("cancel");
-    const res = await fetch(cancelEndpoint, { method: "POST" });
+    const res = await apiFetch(cancelEndpoint, { method: "POST" });
     if (res.ok) {
       router.refresh();
     } else {
@@ -191,44 +194,46 @@ export function OrderDetail({
 
   const timeline = buildTimeline(order);
 
+  // Merchant dashboard uses the same light palette as the rest of the portal
+  // (white cards / slate text). Ops keeps its existing light MerchantCard layout.
   const shellCls = merchantMode
-    ? "rounded-2xl border border-slate-200 bg-[#0b1220] p-6 shadow-sm md:p-8"
+    ? "animate-slide-up rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
     : "animate-slide-up space-y-6";
 
   const sectionCls = merchantMode
-    ? "rounded-xl border border-white/10 bg-white/[0.03] p-5"
+    ? "rounded-xl border border-slate-200 bg-slate-50/80 p-5"
     : "";
 
-  const labelCls = merchantMode ? "text-xs uppercase tracking-wide text-white/40" : "text-xs uppercase tracking-wide text-white/40";
-  const valueCls = merchantMode ? "text-white" : "text-white";
+  const labelCls = "text-xs uppercase tracking-wide text-slate-500";
+  const valueCls = "text-slate-900";
+  const mutedCls = "text-slate-500";
+  const OpsCard = MerchantCard;
+  const OpsButton = MerchantButton;
+  const OpsSelect = MerchantSelect;
 
   return (
     <div className={shellCls}>
       <div className={`${merchantMode ? "mb-6" : ""} flex items-center gap-3`}>
         <Link
           href={backHref}
-          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-            merchantMode
-              ? "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-          }`}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
           aria-label="Back to Orders"
         >
           ←
         </Link>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-mono text-xl font-semibold text-white md:text-2xl">
+            <h1 className="font-mono text-xl font-semibold text-slate-900 md:text-2xl">
               {formatOrderCode(orderRank)}
             </h1>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${orderStatusBadgeClasses(order.status)}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${orderStatusBadgeClasses(order.status, true)}`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {orderStatusLabel(order.status)}
             </span>
           </div>
-          <p className="text-sm text-white/50">Created {formatTimestamp(order.created_at)}</p>
+          <p className={`text-sm ${mutedCls}`}>Created {formatTimestamp(order.created_at)}</p>
         </div>
       </div>
 
@@ -262,7 +267,7 @@ export function OrderDetail({
         <div className={`space-y-6 ${merchantMode ? "" : "lg:col-span-2"}`}>
           {merchantMode ? (
             <div className={sectionCls}>
-              <h2 className="mb-4 font-semibold text-white">Customer Details</h2>
+              <h2 className="mb-4 font-semibold text-slate-900">Customer Details</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <p className={labelCls}>Name</p>
@@ -276,13 +281,13 @@ export function OrderDetail({
                   <p className={labelCls}>Delivery Address</p>
                   <p className={`mt-1 ${valueCls}`}>{order.delivery_address}</p>
                   {order.address_detail ? (
-                    <p className="mt-1 text-sm text-white/60">{order.address_detail}</p>
+                    <p className="mt-1 text-sm text-slate-500">{order.address_detail}</p>
                   ) : null}
                 </div>
               </div>
             </div>
           ) : (
-          <Card title="Customer Details">
+          <OpsCard title="Customer Details">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className={labelCls}>Name</p>
@@ -305,13 +310,13 @@ export function OrderDetail({
               {order.delivery_lat != null && order.delivery_lng != null && (
                 <div className="col-span-2">
                   <p className={labelCls}>Coordinates</p>
-                  <p className="font-mono text-sm text-brand-gold/80">
+                  <p className="font-mono text-sm text-[var(--merchant-primary)]">
                     {order.delivery_lat.toFixed(6)}, {order.delivery_lng.toFixed(6)}
                   </p>
                 </div>
               )}
             </div>
-          </Card>
+          </OpsCard>
           )}
 
           {order.status !== "delivered" &&
@@ -320,9 +325,14 @@ export function OrderDetail({
             order.status !== "flagged_review" &&
             (merchantMode ? (
               <div className={sectionCls}>
-                <h2 className="mb-4 font-semibold text-white">Assign Rider</h2>
+                <h2 className="mb-4 font-semibold text-slate-900">Assign Rider</h2>
+                {order.branch_id ? (
+                  <p className="mb-3 text-xs text-slate-500">
+                    Showing riders for this order&apos;s branch only.
+                  </p>
+                ) : null}
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Select
+                  <MerchantSelect
                     className="flex-1"
                     value={selectedRider}
                     onChange={(e) => setSelectedRider(e.target.value)}
@@ -333,13 +343,11 @@ export function OrderDetail({
                         {r.name} — {r.phone}
                       </option>
                     ))}
-                  </Select>
-                  <button
-                    type="button"
+                  </MerchantSelect>
+                  <MerchantButton
                     onClick={() => assign(false)}
                     disabled={busy || !selectedRider}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#0b1220] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
+                    className="shrink-0"
                   >
                     {busyAction === "assign" && <Spinner className="h-4 w-4" />}
                     {busyAction === "assign"
@@ -347,7 +355,7 @@ export function OrderDetail({
                       : order.assigned_rider_id
                         ? "Reassign"
                         : "Assign"}
-                  </button>
+                  </MerchantButton>
                 </div>
                 {needsConfirm && (
                   <div className="mt-3 animate-scale-in space-y-2">
@@ -355,23 +363,22 @@ export function OrderDetail({
                       This order already has a rider assigned. Confirm to reassign — the previous
                       rider will lose access in the Rider app.
                     </StatusBanner>
-                    <button
-                      type="button"
-                      onClick={() => assign(true)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#0b1220] disabled:opacity-40"
-                      style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
-                    >
+                    <MerchantButton onClick={() => assign(true)} disabled={busy}>
                       {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
                       {busyAction === "reassign" ? "Reassigning…" : "Confirm Reassignment"}
-                    </button>
+                    </MerchantButton>
                   </div>
                 )}
               </div>
             ) : (
-            <Card title="Assign Rider">
+            <OpsCard title="Assign Rider">
+              {order.branch_id ? (
+                <p className="mb-3 text-xs text-slate-500">
+                  Showing riders for this order&apos;s branch only.
+                </p>
+              ) : null}
               <div className="flex gap-2">
-                <Select
+                <OpsSelect
                   className="flex-1"
                   value={selectedRider}
                   onChange={(e) => setSelectedRider(e.target.value)}
@@ -382,64 +389,61 @@ export function OrderDetail({
                       {r.name} — {r.phone}
                     </option>
                   ))}
-                </Select>
-                <Button onClick={() => assign(false)} disabled={busy || !selectedRider}>
+                </OpsSelect>
+                <OpsButton onClick={() => assign(false)} disabled={busy || !selectedRider}>
                   {busyAction === "assign" && <Spinner className="h-4 w-4" />}
                   {busyAction === "assign"
                     ? "Assigning…"
                     : order.assigned_rider_id
                       ? "Reassign"
                       : "Assign"}
-                </Button>
+                </OpsButton>
               </div>
               {needsConfirm && (
                 <div className="mt-3 animate-scale-in space-y-2">
                   <StatusBanner tone="warning">
                     This order already has an active rider. Confirm to reassign — the current rider&apos;s link will be revoked immediately.
                   </StatusBanner>
-                  <Button onClick={() => assign(true)} disabled={busy}>
+                  <OpsButton onClick={() => assign(true)} disabled={busy}>
                     {busyAction === "reassign" && <Spinner className="h-4 w-4" />}
                     {busyAction === "reassign" ? "Reassigning…" : "Confirm Reassignment"}
-                  </Button>
+                  </OpsButton>
                 </div>
               )}
-            </Card>
+            </OpsCard>
             ))}
 
           {((showRiderLinks && activeRiderToken) || activeCustomerToken) &&
             (merchantMode && activeCustomerToken ? (
               <div className={sectionCls}>
-                <h2 className="mb-2 font-semibold text-white">Customer Tracking URL</h2>
-                <p className="mb-4 text-sm text-white/60">
+                <h2 className="mb-2 font-semibold text-slate-900">Customer Tracking URL</h2>
+                <p className="mb-4 text-sm text-slate-500">
                   Send this link to your customer via SMS, WhatsApp, or email so they can track the
                   delivery live.
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-white/80">
+                  <p className="text-sm text-slate-700">
                     Tracking URL{" "}
-                    <span className="text-xs text-white/40">No PIN required</span>
+                    <span className="text-xs text-slate-400">No PIN required</span>
                   </p>
                   <div className="flex gap-2">
                     <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
-                      <button
-                        type="button"
-                        className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/5"
-                      >
+                      <MerchantButton variant="secondary" size="sm">
                         Open
-                      </button>
+                      </MerchantButton>
                     </a>
-                    <button
-                      type="button"
+                    <MerchantButton
+                      variant="secondary"
+                      size="sm"
                       onClick={() => copyLink("customer", `${origin}/customer/${activeCustomerToken.token}`)}
-                      className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/5"
                     >
                       {copied === "customer" ? "Copied!" : "Copy"}
-                    </button>
+                    </MerchantButton>
                   </div>
                 </div>
               </div>
             ) : !merchantMode ? (
-            <Card
+            <OpsCard
               title="Active Links"
               className="animate-fade-in"
             >
@@ -447,62 +451,64 @@ export function OrderDetail({
                 {showRiderLinks && activeRiderToken && (
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm text-white/70">
+                      <p className="min-w-0 flex-1 truncate text-sm text-slate-600">
                         Rider Link
                         {displayedPin && (
-                          <span className="ml-2 font-mono text-xs text-brand-gold">PIN: {displayedPin}</span>
+                          <span className="ml-2 font-mono text-xs text-[var(--merchant-primary)]">
+                            PIN: {displayedPin}
+                          </span>
                         )}
                       </p>
                       <a href={`/rider/${activeRiderToken.token}`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="accent-outline" size="sm">
+                        <OpsButton variant="secondary" size="sm">
                           Open
-                        </Button>
+                        </OpsButton>
                       </a>
-                      <Button
-                        variant="accent-outline"
+                      <OpsButton
+                        variant="secondary"
                         size="sm"
                         onClick={() => copyLink("rider", `${origin}/rider/${activeRiderToken.token}`)}
                       >
                         {copied === "rider" ? "Copied!" : "Copy"}
-                      </Button>
+                      </OpsButton>
                     </div>
                   </div>
                 )}
                 {activeCustomerToken && (
                   <div className="flex items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate text-sm text-white/70">
+                    <p className="min-w-0 flex-1 truncate text-sm text-slate-600">
                       Customer Link{" "}
-                      <span className="text-xs text-white/40">No PIN required</span>
+                      <span className="text-xs text-slate-400">No PIN required</span>
                     </p>
                     <a href={`/customer/${activeCustomerToken.token}`} target="_blank" rel="noopener noreferrer">
-                      <Button variant="accent-outline" size="sm">
+                      <OpsButton variant="secondary" size="sm">
                         Open
-                      </Button>
+                      </OpsButton>
                     </a>
-                    <Button
-                      variant="accent-outline"
+                    <OpsButton
+                      variant="secondary"
                       size="sm"
                       onClick={() => copyLink("customer", `${origin}/customer/${activeCustomerToken.token}`)}
                     >
                       {copied === "customer" ? "Copied!" : "Copy"}
-                    </Button>
+                    </OpsButton>
                   </div>
                 )}
               </div>
-            </Card>
+            </OpsCard>
             ) : null)}
 
           {showResetSessionAction && activeRiderToken && (
-            <Card title="Device Swap" className="animate-fade-in">
-              <p className="mb-3 text-sm text-white/60">
+            <OpsCard title="Device Swap" className="animate-fade-in">
+              <p className="mb-3 text-sm text-slate-500">
                 Resets the rider&apos;s session and generates a new PIN. Use when the rider changes
                 device.
               </p>
-              <Button variant="accent-outline" onClick={resetSession} disabled={busy}>
+              <OpsButton variant="secondary" onClick={resetSession} disabled={busy}>
                 {busyAction === "reset" && <Spinner className="h-4 w-4" />}
                 {busyAction === "reset" ? "Resetting…" : "Reset Session"}
-              </Button>
-            </Card>
+              </OpsButton>
+            </OpsCard>
           )}
 
           {showCancelAction && order.status !== "delivered" && order.status !== "cancelled" && (
@@ -523,7 +529,7 @@ export function OrderDetail({
         <div>
           {merchantMode ? (
             <div className={`${sectionCls} h-full`}>
-              <h2 className="mb-4 font-semibold text-white">Status History</h2>
+              <h2 className="mb-4 font-semibold text-slate-900">Status History</h2>
               <ol className="space-y-5">
                 {timeline.map((event, i) => {
                   const isCurrent = i === timeline.length - 1;
@@ -532,18 +538,22 @@ export function OrderDetail({
                       <span className="relative mt-1 flex h-3 w-3 shrink-0 items-center justify-center">
                         {isCurrent ? (
                           <span
-                            className="h-2.5 w-2.5 rotate-45"
-                            style={{ backgroundColor: "var(--merchant-secondary, #ffd700)" }}
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: "var(--merchant-primary)" }}
                           />
                         ) : (
-                          <span className="h-2 w-2 rounded-full bg-white/25" />
+                          <span className="h-2 w-2 rounded-full bg-slate-300" />
                         )}
                       </span>
                       <div>
-                        <p className={`text-sm font-medium ${isCurrent ? "text-white" : "text-white/70"}`}>
+                        <p
+                          className={`text-sm font-medium ${
+                            isCurrent ? "text-slate-900" : "text-slate-600"
+                          }`}
+                        >
                           {event.label}
                         </p>
-                        <p className="text-xs text-white/40">{formatTimestamp(event.at)}</p>
+                        <p className="text-xs text-slate-400">{formatTimestamp(event.at)}</p>
                       </div>
                     </li>
                   );
@@ -551,23 +561,25 @@ export function OrderDetail({
               </ol>
             </div>
           ) : (
-          <Card title="Status History">
+          <OpsCard title="Status History">
             <ol className="space-y-4">
               {timeline.map((event, i) => (
                 <li key={`${event.label}-${event.at}`} className="flex gap-3">
                   <span
                     className={`mt-1 flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                      i === timeline.length - 1 ? "bg-brand-gold" : "bg-white/25"
+                      i === timeline.length - 1
+                        ? "bg-[var(--merchant-primary)]"
+                        : "bg-slate-300"
                     }`}
                   />
                   <div>
-                    <p className="text-sm font-medium text-white">{event.label}</p>
-                    <p className="text-xs text-white/40">{formatTimestamp(event.at)}</p>
+                    <p className="text-sm font-medium text-slate-900">{event.label}</p>
+                    <p className="text-xs text-slate-400">{formatTimestamp(event.at)}</p>
                   </div>
                 </li>
               ))}
             </ol>
-          </Card>
+          </OpsCard>
           )}
         </div>
       </div>
